@@ -67,7 +67,4 @@ foreach ($sourceInstance in $fromInstance){
                                        -maxDataStreams $maxDataStreams `
                                        -timestampMs $timestampMs `
 	                               -confirm:$false
-
-
-
 }
