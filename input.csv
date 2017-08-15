@@ -1,2 +1,2 @@
-se-pmilanes-win,bronze
-se-pmilanes-linux,bronze
+hostname, instance, dbname
+devops-sql.rangers.lab, MSSQLSERVER, vcloud
