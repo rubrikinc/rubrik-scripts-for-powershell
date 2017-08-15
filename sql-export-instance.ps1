@@ -63,8 +63,8 @@ foreach ($sourceInstance in $fromInstance){
    $exportCall = Export-RubrikDatabase -id $sourceInstance.id `
                                        -targetInstanceId $targetInstanceId `
                                        -targetDatabaseName $targetDatabaseName `
-                                       -finishRecovery `
                                        -maxDataStreams $maxDataStreams `
                                        -timestampMs $timestampMs `
+                                       -finishRecovery `
 	                               -confirm:$false
 }
