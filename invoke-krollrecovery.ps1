@@ -64,13 +64,18 @@ if(-not $global:DefaultVIServers){
 #connect to the Rubrik cluster
 Connect-Rubrik -Server $RubrikCluster -Credential $RubrikCred | Out-Null
 
+$reqdate = Read-Host 'Enter desired snapshot date (yyyy-mm-dd)' 
+
 #Collect Snaps from the last 24 hours
-$snaps = Get-RubrikVM -Name $TargetServer | Get-RubrikSnapshot | Where-Object {$_.date -gt (Get-Date).AddDays(-1)} | Sort-Object Date -Descending | Select-Object -First 10
+# Want a date range, show backups between 
+$snaps = Get-RubrikVM -Name $TargetServer | Get-RubrikSnapshot | Where-Object {((get-date $_.date).Date -eq $reqdate)} | Sort-Object Date -Descending | Select-Object 
+#$snaps = Get-RubrikVM -Name $TargetServer | Get-RubrikSnapshot | Where-Object {$_.date -gt (Get-Date).AddDays(-1)} | Sort-Object Date -Descending | Select-Object -First 10
+
 
 #Choose snap to use
 "Please select a snapshot to use:" | Out-Host
 "--------------------------------" | Out-Host
-$Snaps  | ForEach-Object -Begin {$i=0} -Process {"SnapID $i - $($_.Date)";$i++}
+$Snaps  | ForEach-Object -Begin {$i=0} -Process {"SnapID $i - $(get-date $_.Date)";$i++}
 $selection = Read-Host 'Enter ID of selected snapshot'
 
 #Move VMDKs from LiveMount of target to KROLL Server
