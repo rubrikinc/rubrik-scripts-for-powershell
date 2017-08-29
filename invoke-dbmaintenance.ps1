@@ -38,7 +38,7 @@ do{
 
     #Get current listing of snapshots that are within the the check window
     $SystemDBCheck = @($SystemDatabases | Get-RubrikSnapshot -Date (Get-Date) | Where-Object {(Get-Date $_.date) -gt $CheckTime})
-    $UserDBCheck =@($UserDatabases | Get-RubrikSnapshot -Date (Get-Date) | Where-Object {(Get-Date $_.date) -gt $CheckTime})
+    $UserDBCheck  = @($UserDatabases | Get-RubrikSnapshot -Date (Get-Date) | Where-Object {(Get-Date $_.date) -gt $CheckTime})
 
     #If we have enough snapshots for the system databases and the system maintenance hasn't been started, start system maintenance
     if($SystemDatabases.Count -eq $SystemDBCheck.Count -and $SystemMaintenace -eq $false){
