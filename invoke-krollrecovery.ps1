@@ -22,12 +22,12 @@
       GitHub: MikeFal
 
       .EXAMPLE
-      .\KrollRecovery.ps1 -KrollServer 'DEMO-KROLL2' -ExchangeServer 'DEMO-EXCH10-1' -RubrikCluster 172.17.28.15 -VCenter demovcsa.rubrik.demo
+      .\KrollRecovery.ps1 -KrollServer 'DEMO-KROLL2' -TargetServer 'DEMO-EXCH10-1' -RubrikCluster 172.17.28.15 -VCenter demovcsa.rubrik.demo
 
       Execute the KrollRecovery script remotely.
       
       .EXAMPLE
-      .\KrollRecovery.ps1 -ExchangeServer 'DEMO-EXCH10-1' -RubrikCluster 172.17.28.15 -VCenter demovcsa.rubrik.demo
+      .\KrollRecovery.ps1 -TargetServer 'DEMO-EXCH10-1' -RubrikCluster 172.17.28.15 -VCenter demovcsa.rubrik.demo
 
       Execute the KrollRecovery script locally.
       
