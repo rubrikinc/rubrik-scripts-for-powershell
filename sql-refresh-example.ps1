@@ -5,7 +5,7 @@ import-module Rubrik
 $cred = Get-Credential 
 
 #Connect to Rubrik server
-Connect-Rubrik -Server <RUBRIK IP/DNS NAME> -Credential $cred 
+Connect-Rubrik -Server '<Rubrik IP>' -Credential $cred -Verbose
 
 #Export all dbs to another instance, no file relocation
 $SourceServer = 'SERVERA'
@@ -14,7 +14,7 @@ $TargetServer = 'SERVERB'
 $db = Get-RubrikDatabase -Hostname $SourceServer -Instance 'MSSQLSERVER' | Where-Object {@('master','model','msdb') -notcontains $_.Name -and $_.isRelic -ne 'True'}
 $TargetInstanceID = (Get-RubrikDatabase -Hostname $TargetServer -Instance 'MSSQLSERVER' -Database 'master').instanceId
 
-$db | Export-RubrikDatabase -RecoveryDateTime (Get-Date '2017-06-26T12:00:00') -TargetInstanceId $TargetInstanceID -WhatIf
+$requests = $db | Export-RubrikDatabase -RecoveryDateTime (Get-Date '2017-06-26T12:00:00') -TargetInstanceId $TargetInstanceID -WhatIf
 #If the above -WhatIf output is good, replace -WhatIf with -Confirm:$false
 
 
