@@ -22,12 +22,10 @@ function Wait-RubrikRequests($reqs) {
 }
 
 $source = ConvertFrom-ServerInstance $SourceServerInstance
-$target = ConvertFrom-ServerInstance $TargetServerInstance
-
-$TargetInstance = (Get-RubrikDatabase -Hostname $target.hostname -Instance $target.instancename -Name 'master')[0]
+$TargetInstance = (Get-RubrikSQLInstance -ServerInstance $TargetServerInstance)
 
 "Begining unmount/cleanup process for: $($databases -join ",")" | Out-Host
-$unmount_reqs = Get-RubrikDatabaseMount -TargetInstanceId $TargetInstance.instanceid | 
+$unmount_reqs = Get-RubrikDatabaseMount -TargetInstanceId $TargetInstance.id | 
     Where-Object {$databases -contains $_.sourceDatabaseName} |
     Remove-RubrikDatabaseMount -Confirm:$false 
 
@@ -36,6 +34,6 @@ if($unmount_reqs) {Wait-RubrikRequests $unmount_reqs}
 "Begining mount process for: $($databases -join ",")" | Out-Host
 $mount_reqs = Get-RubrikDatabase -Hostname $source.hostname -Instance $source.instance |
     Where-Object {$databases -contains $_.Name} | 
-    ForEach-Object{$date = Get-RubrikSnapshot -id $_.id -Date (Get-Date); New-RubrikDatabaseMount -TargetInstanceId $TargetInstance.instanceid -MountedDatabaseName $_.name -RecoveryDateTime $date.date -id $_.id -confirm:$false}
+    ForEach-Object{$date = Get-RubrikSnapshot -id $_.id -Date (Get-Date); New-RubrikDatabaseMount -TargetInstanceId $TargetInstance.id -MountedDatabaseName "$($_.name)_LM" -RecoveryDateTime $date.date -id $_.id -confirm:$false}
 
 if($mount_reqs) {Wait-RubrikRequests $mount_reqs}
