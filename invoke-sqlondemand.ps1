@@ -21,6 +21,6 @@ $dbs = $dbs | Select-Object name,recoveryModel,effectiveSLADomainName,latestReco
     Sort-Object name | 
     Out-GridView -PassThru 
     
-$requests = $dbs | New-RubrikSnapshot -Inherit -Confirm:$False
+$requests = $dbs | ForEach-Object{New-RubrikSnapshot -id $_.id -Inherit -Confirm:$False}
 
 return $requests 
