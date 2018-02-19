@@ -4,6 +4,8 @@ param(
     ,[string] $OutPath = [Environment]::GetFolderPath("MyDocuments")
     ,[string] $QueryPath = '.\'
     ,[Switch] $Anonymize
+    ,[string] $SqlUser
+    ,[string] $SqlPassword
 )
 BEGIN{
     if(Get-Module -ListAvailable SqlServer){Import-Module SqlServer}
@@ -25,7 +27,11 @@ foreach($i in $SQLInstance){
         if($Anonymize){$sql = $sql.Replace("@@SERVERNAME","'$serverid'")}
         $OutFile = Join-Path -Path $OutPath -ChildPath $q.filename
 
-        $output = Invoke-SqlCmd -ServerInstance "$i" -Database TempDB -Query "$sql" 
+        if($SqlUser -and $SqlPassword){
+            $output = Invoke-SqlCmd -ServerInstance "$i" -Database TempDB -Query "$sql" -Username $SqlUser -Password $SqlPassword 
+        } else {
+            $output = Invoke-SqlCmd -ServerInstance "$i" -Database TempDB -Query "$sql" 
+        }
 
         if($header -eq $true){
             $output | ConvertTo-Csv -Delimiter '|' -NoTypeInformation | Out-File $OutFile -Append
