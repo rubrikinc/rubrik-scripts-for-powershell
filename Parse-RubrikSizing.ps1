@@ -1,6 +1,6 @@
 param($csvfile
       ,$delimiter = '|'
-      ,[int[]]$HistogramBins=@(1000,10000,100000,500000,1000000))
+      ,[int[]]$HistogramBins=@(1,10,100,500,1000))
 
 $rawdata = Get-Content $csvfile | ConvertFrom-Csv -Delimiter $delimiter
 
@@ -20,12 +20,12 @@ $return = [ordered]@{
 
 $BinStart = 0
 foreach($bin in $HistogramBins){
-    $BinCount = ($rawdata | Where-Object {[int]$_.DBTotalSizeMB -gt $BinStart -and [int]$_.DBTotalSizeMB -le $bin} | Measure-Object).Count
-    $return.Add("Histogram:$bin",$BinCount)
+    $BinCount = ($rawdata | Where-Object {[int]$_.DBTotalSizeMB/1024 -gt $BinStart -and [int]$_.DBTotalSizeMB/1024 -le $bin} | Measure-Object).Count
+    $return.Add("Histogram (GBs) :$bin",$BinCount)
     $BinStart = $bin
 }
 
-$BinCount = ($rawdata | Where-Object {[int]$_.DBTotalSizeMB -gt $BinStart} | Measure-Object).Count
+$BinCount = ($rawdata | Where-Object {[int]$_.DBTotalSizeMB/1024 -gt $BinStart} | Measure-Object).Count
 $return.Add("Histogram:More",$BinCount)
 
 return $return
