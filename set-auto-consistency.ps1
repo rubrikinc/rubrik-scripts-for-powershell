@@ -11,7 +11,7 @@
 
 
 
-$vms = Get-RubrikVM devops-vra 
+$vms = Get-RubrikVM 
 
 foreach($vm in $vms){
   if($vm.effectiveSlaDomainName -ne 'Unprotected'){
