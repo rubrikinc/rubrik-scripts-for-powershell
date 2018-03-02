@@ -11,7 +11,7 @@ param([switch]$pause)
 # set-toggle-vm-blackout.ps1 -Pause:$false
 
 
-$vms = Get-RubrikVM 
+$vms = Get-RubrikVM devops-vra 
 
 foreach($vm in $vms){
   if($vm.effectiveSlaDomainName -ne 'Unprotected'){
