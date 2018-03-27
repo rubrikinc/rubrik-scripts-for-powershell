@@ -15,10 +15,10 @@
 # --------------------
 Import-Module Rubrik
 # Replace variables here:
-$rubrik_cluster = 'rubrik.demo.com'
+$rubrik_cluster = 'rubrik0demo.com'
 $rubrik_user = 'admin'
-$rubrik_pass = 'MyP@ss123!'
-$output_type = 'html' # enter 'html' for an html report, or 'text' for a plain text report
+$rubrik_pass = 'MyP@ss!'
+$output_type = 'csv' # enter 'html' for an html report, 'csv' for a CSV based-report, or 'text' for a plain text report
 # Do not change anything after this point
 # Set up web headers for certain API calls
 $headers = @{
@@ -231,7 +231,7 @@ TD {border-width: 1px; padding: 3px; border-style: solid; border-color: black; f
         $output_html += "<p><b>Archival Settings:</b></p>"
         if ($sla_domain.archive -ne $null) {
             if ($sla_domain.archive.instantArchive -eq 1) {
-                if (0 -eq $sla_domain.archive.retentionOnBrik % 31536000 -and $sla_domain.archive.retentionOnBrik -eq 1) {
+                if (0 -eq $sla_domain.archive.retentionOnBrik % 31536000 -and $sla_domain.archive.instantArchive -eq 1) {
                     $output_html += "<p>The SLA domain is archived to $($sla_domain.archive.target) with Instant Archive enabled, and is kept on the local cluster for $($sla_domain.archive.retentionOnBrik / 31536000) years</p>"
                 } else {
                     $output_html += "<p>The SLA domain is archived to $($sla_domain.archive.target) with Instant Archive enabled, and is kept on the local cluster for $($sla_domain.archive.retentionOnBrik / 86400) days</p>"
@@ -248,7 +248,7 @@ TD {border-width: 1px; padding: 3px; border-style: solid; border-color: black; f
         }
         $output_html += "<p><b>Replication Settings:</b></p>"
         if ($sla_domain.replication -ne $null) {
-            if (0 -eq $sla_domain.replication.retention % 31536000 -and $sla_domain.replication.retention) {
+            if (0 -eq $sla_domain.replication.retention % 31536000) {
                 $output_html += "<p>The SLA domain is replicated to $($sla_domain.replication.target), and is kept on the remote cluster for $($sla_domain.replication.retention / 31536000) years</p>"
             } else {
                 $output_html += "<p>The SLA domain is replicated to $($sla_domain.replication.target), and is kept on the remote cluster for $($sla_domain.replication.retention / 86400) days</p>"
@@ -292,4 +292,60 @@ TD {border-width: 1px; padding: 3px; border-style: solid; border-color: black; f
         $output_html += "<hr>"
     }
     $output_html > $output_file_name
+}
+if ($output_type -eq 'csv') {
+    $output_file_name = $(get-date -uFormat "%Y%m%d-%H%M%S") + "-RubrikSLAReport.csv"
+    $output_csv = @()
+    $output_array = @()
+    foreach ($sla_domain in $output_object) {
+        $row = '' | select name,cluster,timedate,policy_hourly,policy_daily,policy_monthly,policy_yearly,archival_location,archival_instant,archival_local_retention,replication_location,replication_target_retention,protected_vms,protected_dbs,protected_filesets
+        $row.name = $sla_domain.name
+        $row.cluster = $rubrik_cluster
+        $row.timedate = $(Get-Date)
+        if ($sla_domain.frequencies.timeUnit.Contains("Hourly")) {
+            $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Hourly"
+            $row.policy_hourly = "Take every $($policy.frequency) Hour(s), keep for $($policy.retention / 24) Day(s)"
+        }
+        if ($sla_domain.frequencies.timeUnit.Contains("Daily")) {
+            $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Daily"
+            $row.policy_daily = "Take every $($policy.frequency) Day(s), keep for $($policy.retention) Day(s)"
+        }
+        if ($sla_domain.frequencies.timeUnit.Contains("Monthly")) {
+            $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Monthly"
+            $row.policy_monthly = "Take every $($policy.frequency) Month(s), keep for $($policy.retention / 12) Year(s)"
+        }
+        if ($sla_domain.frequencies.timeUnit.Contains("Yearly")) {
+            $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Yearly"
+            $row.policy_yearly = "Take every $($policy.frequency) Year(s), keep for $($policy.retention) Year(s)"
+        }
+        if ($sla_domain.archive.target) {
+            $row.archival_location = $sla_domain.archive.target
+        }
+        if ($sla_domain.archive.instantArchive -eq 1) {
+            $row.archival_instant = $true
+        } else {
+            $row.archival_instant = $false
+        }
+        if ($sla_domain.archive.retentionOnBrik) {
+            if (0 -eq $sla_domain.archive.retentionOnBrik % 31536000) {
+                $row.archival_local_retention = "$($sla_domain.archive.retentionOnBrik / 31536000) years"
+            } else {
+                $row.archival_local_retention = "$($sla_domain.archive.retentionOnBrik / 86400) days"
+            }
+        }
+        if ($sla_domain.replication) {
+            $row.replication_location = $sla_domain.replication.target
+            if (0 -eq $sla_domain.replication.retention % 31536000 -and $sla_domain.replication.retention -ne 0) {
+                $row.replication_target_retention = "$($sla_domain.replication.retention / 31536000) years"
+            } else {
+                $row.replication_target_retention = "$($sla_domain.replication.retention / 86400) days"
+            }
+        }
+        $row.protected_vms = $($sla_domain.vms -join ';')
+        $row.protected_dbs = $($sla_domain.databases -join ';')
+        $row.protected_filesets =  $($sla_domain.filesets -join ';')
+        $output_array += $row
+    }
+    $output_csv += $output_array | ConvertTo-Csv
+    $output_csv > $output_file_name
 }
