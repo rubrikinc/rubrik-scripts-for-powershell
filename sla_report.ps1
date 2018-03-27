@@ -15,10 +15,11 @@
 # --------------------
 Import-Module Rubrik
 # Replace variables here:
-$rubrik_cluster = 'rubrik0demo.com'
+$rubrik_cluster = 'rubrik.demo.com'
 $rubrik_user = 'admin'
-$rubrik_pass = 'MyP@ss!'
-$output_type = 'csv' # enter 'html' for an html report, 'csv' for a CSV based-report, or 'text' for a plain text report
+$rubrik_pass = 'MyP@ss123!'
+$output_type = 'text' # enter 'html' for an html report, 'csv' for a CSV based-report, or 'text' for a plain text report
+$output_folder = '.' # this can be modified to 'C:\temp' or whatever is required, leave as '.' to write to script path, do not include trailing slash on folder path
 # Do not change anything after this point
 # Set up web headers for certain API calls
 $headers = @{
@@ -71,7 +72,7 @@ foreach ($rk_sla in $rk_all_slas) {
 }
 # Now we output the report
 if ($output_type -eq 'text') {
-    $output_file_name = $(get-date -uFormat "%Y%m%d-%H%M%S") + "-RubrikSLAReport.txt"
+    $output_file_name = $output_folder + "\" + $(get-date -uFormat "%Y%m%d-%H%M%S") + "-RubrikSLAReport.txt"
     Write-Output "============================================" | Tee-Object -FilePath $output_file_name -Append
     Write-Output "SLA Domain Report" | Tee-Object -FilePath $output_file_name -Append
     Write-Output "Rubrik Cluster: $rubrik_cluster" | Tee-Object -FilePath $output_file_name -Append
@@ -175,7 +176,7 @@ if ($output_type -eq 'text') {
     }
 }
 if ($output_type -eq 'html') {
-    $output_file_name = $(get-date -uFormat "%Y%m%d-%H%M%S") + "-RubrikSLAReport.html"
+    $output_file_name = $output_folder + "\" + $(get-date -uFormat "%Y%m%d-%H%M%S") + "-RubrikSLAReport.html"
     $output_html = @()
     $style_head = @"
 <head><style>
@@ -294,7 +295,7 @@ TD {border-width: 1px; padding: 3px; border-style: solid; border-color: black; f
     $output_html > $output_file_name
 }
 if ($output_type -eq 'csv') {
-    $output_file_name = $(get-date -uFormat "%Y%m%d-%H%M%S") + "-RubrikSLAReport.csv"
+    $output_file_name = $output_folder + "\" + $(get-date -uFormat "%Y%m%d-%H%M%S") + "-RubrikSLAReport.csv"
     $output_csv = @()
     $output_array = @()
     foreach ($sla_domain in $output_object) {
