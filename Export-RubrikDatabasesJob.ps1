@@ -29,15 +29,19 @@
         Created:    2/6/2018
         Author:     Chris Lumnah
         Execution Process:
-            1. Use included script called Create-SecurePasswordFile.ps1 to create a file called Credential.txt. The 
-                contents of this file will contain an encrypted string used as a password. The credential.txt file can
-                only be used on the machine that Create-SecurePasswordFile.ps1 was run as the encryption method uses the 
-                machine as part of the encryption process.
+            1. Before running this script, you need to create a credential file so that you can securly log into the Rubrik 
+            Cluster. To do so run the below command via Powershell
+
+            $Credential = Get-Credential
+            $Credential | Export-CliXml -Path .\rubrik.Cred"
+            
+            The above will ask for a user name and password and them store them in an encrypted xml file.
+            
             2. Modify the JSON file to include the appropriate values. 
                 RubrikCluster
                     Server: IP Address to the Rubrk Cluster
-                    UserName: user name to login to the Rubrik Cluster
-                    Password: Path to the Credential.txt file created in the previous step.
+                    Credential: Should contain the full path and file name to the credential file created in step 1
+                    s
                 Databases - Repeatable array
                     Name: Database name to be exported
                     SourceServerInstance: Source SQL Server Instance
@@ -69,11 +73,14 @@ if (Test-Path -Path $JobFile)
     }
     catch 
     {
-        $Password = Get-Content $JobFIle.RubrikCluster.CredentialFilePassword | ConvertTo-SecureString
-
-         Connect-Rubrik -Server $JobFile.RubrikCluster.Server `
-            -Username $JobFile.RubrikCluster.Username  `
-            -Password $Password | Out-Null
+        #04/05/2018 - Chris Lumnah - Instead of using an encrypted text file, I am now using the more standard
+        #CLiXml method
+        #$Password = Get-Content $JobFIle.RubrikCluster.CredentialFilePassword | ConvertTo-SecureString
+        $Credential = Import-CliXml -Path $JobFIle.RubrikCluster.Credential
+        # Connect-Rubrik -Server $JobFile.RubrikCluster.Server `
+        #    -Username $JobFile.RubrikCluster.Username  `
+        #    -Password $Password | Out-Null
+        Connect-Rubrik -Server $JobFile.RubrikCluster.Server -Credential $Credential
     }
 
     foreach ($Database in $JobFile.Databases)
@@ -123,16 +130,17 @@ In case the JSON file is deleted, you can use the below as an example to recreat
     "RubrikCluster":
     {
         "Server": "172.21.8.31",
-        "Username": "admin",
-        "CredentialFilePassword":"C:\\Users\\chris\\OneDrive\\Documents\\WindowsPowerShell\\Credential.txt"
+        "Credential":"C:\\Users\\chrislumnah\\OneDrive\\Documents\\WindowsPowerShell\\Credentials\\RangerLab-AD.credential",
+        "Username - NO LONGER USED": "admin",
+        "CredentialFilePassword - NO LONGER USED":"C:\\Users\\chris\\OneDrive\\Documents\\WindowsPowerShell\\Credential.txt"
 
     },
     "Databases":
     [ 
         {
             "Name": "AdventureWorks2016",
-            "SourceServerInstance": "cl-sql2016n1",
-            "TargetServerInstance": "cl-sql2016n2",
+            "SourceServerInstance": "cl-sql2016n1.rangers.lab",
+            "TargetServerInstance": "cl-sql2016n2.rangers.lab",
             "Files":
             [
                 {
@@ -149,8 +157,8 @@ In case the JSON file is deleted, you can use the below as an example to recreat
         },
         {
             "Name": "AdventureWorksDW2016",
-            "SourceServerInstance": "cl-sql2016n1",
-            "TargetServerInstance": "cl-sql2016n2",
+            "SourceServerInstance": "cl-sql2016n1.rangers.lab",
+            "TargetServerInstance": "cl-sql2016n2.rangers.lab",
             "Files":
             [
                 {
@@ -167,6 +175,4 @@ In case the JSON file is deleted, you can use the below as an example to recreat
         }
     ]  
 }
-
-
 #>

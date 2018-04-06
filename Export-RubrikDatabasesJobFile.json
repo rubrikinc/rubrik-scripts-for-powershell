@@ -2,16 +2,17 @@
     "RubrikCluster":
     {
         "Server": "172.21.8.31",
-        "Username": "admin",
-        "CredentialFilePassword":"C:\\Users\\chris\\OneDrive\\Documents\\WindowsPowerShell\\Credential.txt"
+        "Credential":"C:\\Users\\chrislumnah\\OneDrive\\Documents\\WindowsPowerShell\\Credentials\\RangerLab-AD.credential",
+        "Username - NO LONGER USED": "admin",
+        "CredentialFilePassword - NO LONGER USED":"C:\\Users\\chris\\OneDrive\\Documents\\WindowsPowerShell\\Credential.txt"
 
     },
     "Databases":
     [ 
         {
             "Name": "AdventureWorks2016",
-            "SourceServerInstance": "cl-sql2016n1",
-            "TargetServerInstance": "cl-sql2016n2",
+            "SourceServerInstance": "cl-sql2016n1.rangers.lab",
+            "TargetServerInstance": "cl-sql2016n2.rangers.lab",
             "Files":
             [
                 {
@@ -28,8 +29,8 @@
         },
         {
             "Name": "AdventureWorksDW2016",
-            "SourceServerInstance": "cl-sql2016n1",
-            "TargetServerInstance": "cl-sql2016n2",
+            "SourceServerInstance": "cl-sql2016n1.rangers.lab",
+            "TargetServerInstance": "cl-sql2016n2.rangers.lab",
             "Files":
             [
                 {
