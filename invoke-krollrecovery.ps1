@@ -53,7 +53,7 @@ param(
     ,[array]$DiskIDstoExclude
 
 )
-
+$ErrorActionPreference = 'Stop'
 #Connect to the VCenter
 if(-not $global:DefaultVIServers){
     if(-not $VCenterCred){$VCenterCred = Get-Credential -Message "Please enter your VCenter credential:" }
