@@ -16,6 +16,7 @@ IF OBJECT_ID('tempdb.dbo.##enterprise_features') IS NOT NULL
 CREATE TABLE ##enterprise_features
   (
 	ServerName	SYSNAME,
+	 dbid		SYSNAME,
      dbname       SYSNAME,
      feature_name VARCHAR(100),
      feature_id   INT
@@ -26,7 +27,7 @@ N' USE [?]
 IF (SELECT COUNT(*) FROM sys.dm_db_persisted_sku_features) >0 
 BEGIN 
    INSERT INTO ##enterprise_features 
-    SELECT @@SERVERNAME, dbname=DB_NAME(),feature_name,feature_id 
+    SELECT @@SERVERNAME, dbid=DB_ID(), dbname=DB_NAME(),feature_name,feature_id 
     FROM sys.dm_db_persisted_sku_features 
 END '
 SELECT *
