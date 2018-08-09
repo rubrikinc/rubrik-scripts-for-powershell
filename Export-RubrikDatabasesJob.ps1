@@ -71,8 +71,8 @@
                     - Added ability to restore databases to any point in time with in the last 24 hours.
                       Useful for refreshing databases to a specific point in time. 
                     - Added CmdletBinding for Verbose and Debug output.
-                    - Removed CredentialFilePassword and Username from json files and code as they are no longer used.
-                    - Added recover job tracking an status reporting.
+                    - Removed CredentialFilePassword and Username from JSON files and code as they are no longer used.
+                    - Added recover job tracking and status reporting.
 
 
 #>
