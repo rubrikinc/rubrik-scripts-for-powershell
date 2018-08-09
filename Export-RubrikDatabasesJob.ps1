@@ -92,6 +92,7 @@ if (Test-Path -Path $JobFile) {
 
     #Currently there is no way to check for an existing connection to a Rubrik Cluster. This attempts to do that and only 
     #connects if an existing connection is not present. 
+    Write-Host("Connecting to Rubrik cluster node $($JobFile.RubrikCluster.Server)...")
     try 
     {
         Get-RubrikVersion | Out-Null
@@ -148,17 +149,33 @@ if (Test-Path -Path $JobFile) {
         }
 
         Write-Verbose ("RestoreTime is: $RestoreTime")
-        Write-Host ("Restoring database " + $Database.Name + " to restore point: $RestoreTime...")
-        $Result = Export-RubrikDatabase -Id $RubrikDatabase.id `
-            -TargetInstanceId $TargetInstance.id `
-            -TargetDatabaseName $Database.Name `
-            -recoveryDateTime $RestoreTime `
-            -FinishRecovery `
-            -TargetFilePaths $TargetFiles `
-            -Confirm:$false
+        Write-Host ("Starting restore of database " + $Database.Name + " to restore point: $RestoreTime...")
+        $Result = ""
+        try {
+            $Result = Export-RubrikDatabase -Id $RubrikDatabase.id `
+                -TargetInstanceId $TargetInstance.id `
+                -TargetDatabaseName $Database.Name `
+                -recoveryDateTime $RestoreTime `
+                -FinishRecovery `
+                -TargetFilePaths $TargetFiles `
+                -Confirm:$false
+        } catch {
+            $formatstring = "{0} : {1}`n{2}`n" +
+                "    + CategoryInfo          : {3}`n" +
+                "    + FullyQualifiedErrorId : {4}`n"
+            $fields = $_.InvocationInfo.MyCommand.Name,
+                    $_.ErrorDetails.Message,
+                    $_.InvocationInfo.PositionMessage,
+                    $_.CategoryInfo.ToString(),
+                    $_.FullyQualifiedErrorId
+            Write-Error ("Starting restore request for $($Database.Name) failed.")
+            Write-Error ($formatstring -f $fields)
+        }
         Write-Verbose ("Result is: $Result")
         Write-Verbose ("Exports.add($($Database.Name), $($Result.id))")
-        $Exports.add($Database.Name, $Result.id)
+        if ( -Not [string]::IsNullOrEmpty($Result.id)) {
+            $Exports.add($Database.Name, $Result.id)
+        }
     }
     Write-Verbose ("Exports is:")
     foreach($k in $Exports.Keys){Write-Verbose "$k is $($Exports[$k])"}
@@ -167,10 +184,10 @@ if (Test-Path -Path $JobFile) {
         Write-Verbose ("Export is: $Export")
         $ExportStatus = ""
         while ($ExportStatus.status -notin "SUCCEEDED", "FAILED") {
-            sleep 30
             $ExportStatus = Get-RubrikRequest -id $Exports.$Export -Type mssql
             Write-Verbose ("ExportStatus is: $ExportStatus")
             Write-Host ("SQL Restore job for database " + $Export + " is " + $ExportStatus.status + ", progress: " + $ExportStatus.progress )
+            sleep 30
         }
         if ($ExportStatus.status -match "SUCCEEDED") {
             Write-Host ("SQL Restore of $Export " + $ExportStatus.status)
