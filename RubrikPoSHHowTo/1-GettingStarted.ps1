@@ -21,4 +21,4 @@ $cred | Export-Clixml C:\temp\RubrikCred.xml -Force
 
 notepad C:\temp\RubrikCred.xml
 
-Connect-Rubrik 172.21.8.31 -Credential (Import-Clixml C:\temp\RubrikCred.xml)
+Connect-Rubrik 172.21.8.51 -Credential (Import-Clixml C:\temp\RubrikCred.xml)
