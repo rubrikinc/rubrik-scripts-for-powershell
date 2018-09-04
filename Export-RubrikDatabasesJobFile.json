@@ -1,0 +1,48 @@
+{
+    "RubrikCluster":
+    {
+        "Server": "172.21.8.31",
+        "Credential":"C:\\Users\\chrislumnah\\OneDrive\\Documents\\WindowsPowerShell\\Credentials\\RangerLab-AD.credential"
+    },
+    "Databases":
+    [ 
+        {
+            "Name": "AdventureWorks2016",
+            "RestoreTime": "latest",
+            "SourceServerInstance": "cl-sql2016n1.rangers.lab",
+            "TargetServerInstance": "cl-sql2016n2.rangers.lab",
+            "Files":
+            [
+                {
+                    "LogicalName":"AdventureWorks2016_Data",
+                    "Path":"E:\\Microsoft SQL Server\\MSSQL13.MSSQLSERVER\\MSSQL\\DATA\\",
+                    "FileName":"AdventureWorks2016_Data.mdf"
+                },
+                {
+                    "LogicalName":"AdventureWorks2016_Log",
+                    "Path":"E:\\Microsoft SQL Server\\MSSQL13.MSSQLSERVER\\MSSQL\\DATA\\",
+                    "FileName":"AdventureWorks2016_Log.ldf"
+                }
+            ]
+        },
+        {
+            "Name": "AdventureWorksDW2016",
+            "RestoreTime": "02:00",
+            "SourceServerInstance": "cl-sql2016n1.rangers.lab",
+            "TargetServerInstance": "cl-sql2016n2.rangers.lab",
+            "Files":
+            [
+                {
+                    "LogicalName":"AdventureWorksDW2016_Data",
+                    "Path":"E:\\Microsoft SQL Server\\MSSQL13.MSSQLSERVER\\MSSQL\\DATA\\",
+                    "FileName":"AdventureWorksDW2016_Data.mdf"
+                },
+                {
+                    "LogicalName":"AdventureWorksDW2016_Log",
+                    "Path":"E:\\Microsoft SQL Server\\MSSQL13.MSSQLSERVER\\MSSQL\\DATA\\",
+                    "FileName":"AdventureWorksDW2016_Log.ldf"
+                }
+            ]
+        }
+    ]  
+}
