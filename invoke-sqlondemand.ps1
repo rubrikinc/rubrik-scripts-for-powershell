@@ -1,7 +1,4 @@
-﻿param($ServerInstance
-      ,$RubrikServer
-      ,$RubrikCredential = (Get-Credential -Message 'Please enter your Rubrik credentials')
-      )
+﻿param($ServerInstance)
 
 #Parse ServerInstance 
 if($ServerInstance -contains '\'){
@@ -12,15 +9,12 @@ if($ServerInstance -contains '\'){
     $InstanceName = 'MSSQLSERVER'
 }
 
-#Connect to the Rubrik Cluster
-Connect-Rubrik -Server $RubrikServer -Credential $RubrikCredential
-
 $dbs = Get-RubrikDatabase -Hostname $HostName -Instance $InstanceName | Get-RubrikDatabase | Where-Object {$_.isrelic -ne 'TRUE' -and $_.isLiveMount -ne 'TRUE'}
 
 $dbs = $dbs | Select-Object name,recoveryModel,effectiveSLADomainName,latestRecoveryPoint,id | 
     Sort-Object name | 
     Out-GridView -PassThru 
     
-$requests = $dbs | ForEach-Object{New-RubrikSnapshot -id $_.id -Inherit -Confirm:$False}
+$requests = $dbs | ForEach-Object{New-RubrikSnapshot -id $_.id -SLA $_.effectiveSLADomainName -Confirm:$False}
 
 return $requests 
