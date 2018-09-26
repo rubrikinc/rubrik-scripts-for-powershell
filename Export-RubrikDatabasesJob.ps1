@@ -33,7 +33,7 @@
             Cluster. To do so run the below command via Powershell
 
             $Credential = Get-Credential
-            $Credential | Export-CliXml -Path .\rubrik.Cred"
+            $Credential | Export-CliXml -Path .\rubrik.Cred
             
             The above will ask for a user name and password and them store them in an encrypted xml file.
             
@@ -41,15 +41,21 @@
                 RubrikCluster
                     Server: IP Address to the Rubrik Cluster
                     Credential: Should contain the full path and file name to the credential file created in step 1
+
                 Databases - Repeatable array
-                    Name: Database name to be exported
+                    Name: Database name to be exported    
+                    SourceIsAG: Boolean value. If true, SourceHostName should have an availability group name filled in. If False, then it should be either 
+                                the Windows Cluster Name, or the standalone host name
+                    SourceHostName: Source SQL Server. Value will change based on SourceIsAG being true or false
+                    SourceInstance: Source SQL Server Instance name. Will either be MSSQLSERVER or the named instance value
+                    TargetHostName: Target SQL Server. Value will change based on SourceIsAG being true or false
+                    TargetInstance: Target SQL Server Instance name. Will either be MSSQLSERVER or the named instance value
+                    TargetDatabaseName: Will be the name of the database once restored to the target sql server
                     RestoreTime: A time  to which the database should be restored to. 
                                  Format: (HH:MM:SS.mmm) or (HH:MM:SS.mmmZ) - Restores the database back to the local or 
                                          UTC time (respectively) at the point in time specified within the last 24 hours
                                  Format: Any valid <value> that PS Get-Date supports in: "Get-Date -Date <Value>"
                                          Example: "2018-08-01T02:00:00.000Z" restores back to 2AM on August 1, 2018 UTC.
-                    SourceServerInstance: Source SQL Server Instance
-                    TargetServerInstance: Target SQL Server Instance
                     Files - Repeatable array
                         LogicalName: Represents the logical name of a database file in SQL on the target SQL server.
                         Path: Represents the physical path to a data or log file in SQL on the target SQL server.
@@ -106,76 +112,120 @@ if (Test-Path -Path $JobFile) {
     }
 
     foreach ($Database in $JobFile.Databases) {
-        $RubrikDatabase = Get-RubrikDatabase -Name $Database.Name -ServerInstance $Database.SourceServerInstance
+        if ($Database.SourceIsAG -eq $true) 
+        {
+            $RubrikDatabase = Get-RubrikDatabase -Name $Database.Name -Hostname $Database.SourceHostName 
+        }
+        else 
+        {    
+            $RubrikDatabase = Get-RubrikDatabase -Name $Database.Name -Hostname $Database.SourceHostName -Instance $Database.SourceInstance
+        }
+      
+        #Added test to see if Get-RubrikDatabase found anything. Now, if database is not found in Rubrik, we will exit the script
+        if ([bool]($RubrikDatabase.PSobject.Properties.name -match "name") -eq $false)
+        {
+            Write-Error "Database $($Database.Name) on $($Database.SourceHostName)\$($Database.SourceInstance) was not found"
+            exit
+        }
         
+        #Create a hash table containing all of the files for the database. 
         $TargetFiles = @()
         foreach ($DatabaseFile in $JobFile.Databases.Files)
         {
-                $TargetFiles += @{logicalName=$DatabaseFile.logicalName;exportPath=$DatabaseFile.Path;newFileName=$DatabaseFile.FileName}       
+                $TargetFiles += @{logicalName=$DatabaseFile.logicalName;exportPath=$DatabaseFile.Path;newFilename=$DatabaseFile.FileName}       
         }
 
+        $TargetServerInstance = $Database.TargetHostName
+        if ($Database.TargetInstance -ne "MSSQLSERVER")
+        {
+            $TargetServerInstance = "$($Database.TargetHostName)\$($Database.TargetInstance)"
+        }
 
         #We look for the existence of the database on the target instance. If it exists, we must drop the database before we can 
         #proceed with exportation of the database to the target instance.
-        $Query = "SELECT 1 FROM sys.databases WHERE name = '" + $Database.Name + "'" 
-        $Results = Invoke-Sqlcmd -ServerInstance $Database.TargetServerInstance -Query $Query
 
-        IF ($Results.Column1 -eq 1)
+        $DatabaseName = $Database.Name
+        if ($Database.TargetDatabaseName){$DatabaseName = $Database.TargetDatabaseName}
+
+        $Query = "SELECT state_desc FROM sys.databases WHERE name = '" + $DatabaseName + "'" 
+        $Results = Invoke-Sqlcmd -ServerInstance $TargetServerInstance -Query $Query
+
+        if ([bool]($Results.PSobject.Properties.name -match "state_desc") -eq $true)
         {
-            $Query = "ALTER DATABASE [" + $Database.Name + "] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;"
-            $Results = Invoke-Sqlcmd -ServerInstance $Database.TargetServerInstance -Query $Query
-            $Query = "DROP DATABASE [" + $Database.Name + "]"
-            $Results = Invoke-Sqlcmd -ServerInstance $Database.TargetServerInstance -Query $Query
-            #Refresh Rubik so it does not think the database still exists
-            New-RubrikHost -Name $Database.TargetServerInstance -Confirm:$false | Out-Null
+            IF ($Results.state_desc -eq 'ONLINE')
+            {
+                Write-Host "Setting $($DatabaseName) to SINGLE_USER"
+                Write-Host "Dropping $($DatabaseName)"
+                $Query = "ALTER DATABASE [" + $DatabaseName + "] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; `nDROP DATABASE [" + $DatabaseName + "]"
+                $Results = Invoke-Sqlcmd -ServerInstance $TargetServerInstance -Query $Query
+            }
+            else 
+            {
+                Write-Host "Dropping $($DatabaseName)"
+                $Query = "DROP DATABASE [" + $DatabaseName + "]"
+                $Results = Invoke-Sqlcmd -ServerInstance $TargetServerInstance -Query $Query -Database master
+            }
         }
         
-        $TargetInstance = (Get-RubrikSQLInstance -ServerInstance $Database.TargetServerInstance)
+        #Refresh Rubik so it does not think the database still exists
+        Write-Host "Refreshing $($Database.TargetHostName) in Rubrik"
+        New-RubrikHost -Name $Database.TargetHostName -Confirm:$false | Out-Null
+        
+        $TargetInstance = (Get-RubrikSQLInstance -Hostname $Database.TargetHostName -Instance $Database.TargetInstance)
         $LastRecoveryPoint = (Get-RubrikDatabase -id $RubrikDatabase.ID).latestRecoveryPoint
 
         Write-Verbose ("Latest snapshot time is: $LastRecoveryPoint")
 
-        if ( $Database.RestoreTime -match "latest" ) {
+        if ( $Database.RestoreTime -match "latest" ) 
+        {
             $RestoreTime = Get-date -Date $LastRecoveryPoint
-        } else {
+        } 
+        else 
+        {
             $RawRestoreDate = (get-date -Date $Database.RestoreTime)
             Write-Verbose ("RawRestoreDate is: $RawRestoreDate")
 
-            if ($RawRestoreDate -ge $Now) {
+            if ($RawRestoreDate -ge $Now) 
+            {
                 $RestoreTime = $RawRestoreDate.AddDays(-1)
-            } else {
+            } 
+            else 
+            {
                 $RestoreTime = $RawRestoreDate 
             }
         }
 
         Write-Verbose ("RestoreTime is: $RestoreTime")
-        Write-Host ("Starting restore of database " + $Database.Name + " to restore point: $RestoreTime...")
+        Write-Host ("Starting restore of database " + $DatabaseName + " to restore point: $RestoreTime...")
         $Result = ""
-        try {
+        try 
+        {
             $Result = Export-RubrikDatabase -Id $RubrikDatabase.id `
                 -TargetInstanceId $TargetInstance.id `
-                -TargetDatabaseName $Database.Name `
+                -TargetDatabaseName $DatabaseName `
                 -recoveryDateTime $RestoreTime `
                 -FinishRecovery `
                 -TargetFilePaths $TargetFiles `
                 -Confirm:$false
-        } catch {
+        } 
+        catch 
+        {
             $formatstring = "{0} : {1}`n{2}`n" +
                 "    + CategoryInfo          : {3}`n" +
                 "    + FullyQualifiedErrorId : {4}`n"
+        
             $fields = $_.InvocationInfo.MyCommand.Name,
                     $_.ErrorDetails.Message,
                     $_.InvocationInfo.PositionMessage,
                     $_.CategoryInfo.ToString(),
                     $_.FullyQualifiedErrorId
-            Write-Error ("Starting restore request for $($Database.Name) failed.")
+            Write-Error ("Starting restore request for $($DatabaseName) failed.")
             Write-Error ($formatstring -f $fields)
         }
         Write-Verbose ("Result is: $Result")
-        Write-Verbose ("Exports.add($($Database.Name), $($Result.id))")
-        if ( -Not [string]::IsNullOrEmpty($Result.id)) {
-            $Exports.add($Database.Name, $Result.id)
-        }
+        Write-Verbose ("Exports.add($($DatabaseName), $($Result.id))")
+        
+        if ( -Not [string]::IsNullOrEmpty($Result.id)) {$Exports.add($DatabaseName, $Result.id)}
     }
     Write-Verbose ("Exports is:")
     foreach($k in $Exports.Keys){Write-Verbose "$k is $($Exports[$k])"}
@@ -187,7 +237,7 @@ if (Test-Path -Path $JobFile) {
             $ExportStatus = Get-RubrikRequest -id $Exports.$Export -Type mssql
             Write-Verbose ("ExportStatus is: $ExportStatus")
             Write-Host ("SQL Restore job for database " + $Export + " is " + $ExportStatus.status + ", progress: " + $ExportStatus.progress )
-            sleep 30
+            #Start-Sleep 5
         }
         if ($ExportStatus.status -match "SUCCEEDED") {
             Write-Host ("SQL Restore of $Export " + $ExportStatus.status)
