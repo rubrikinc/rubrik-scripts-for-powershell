@@ -1,4 +1,7 @@
-﻿param($ServerInstance)
+﻿param( [Parameter(ParameterSetName='standalone')]
+     $ServerInstance
+     , [Parameter(ParameterSetName='AG')]
+     $agname)
 
 #Parse ServerInstance 
 if($ServerInstance -contains '\'){
@@ -9,7 +12,11 @@ if($ServerInstance -contains '\'){
     $InstanceName = 'MSSQLSERVER'
 }
 
-$dbs = Get-RubrikDatabase -Hostname $HostName -Instance $InstanceName | Get-RubrikDatabase | Where-Object {$_.isrelic -ne 'TRUE' -and $_.isLiveMount -ne 'TRUE'}
+if($agname){
+    $dbs = Get-RubrikDatabase -Hostname $agname | Get-RubrikDatabase | Where-Object {$_.isrelic -ne 'TRUE' -and $_.isLiveMount -ne 'TRUE'}
+} else {
+    $dbs = Get-RubrikDatabase -Hostname $HostName -Instance $InstanceName | Get-RubrikDatabase | Where-Object {$_.isrelic -ne 'TRUE' -and $_.isLiveMount -ne 'TRUE'}
+}
 
 $dbs = $dbs | Select-Object name,recoveryModel,effectiveSLADomainName,latestRecoveryPoint,id | 
     Sort-Object name | 
