@@ -10,8 +10,8 @@
       Depending on the security context, the user might need to provide credentials for Rubrik.
       Please review the parameters below for more information.
       The volumes are mountedn in c:\rubrik-mounts\Drive-<driveletter>
-      At the beginning of the script all folders in c:\rubrik-mounts are being deleted.
-      If a folder already exists, the mount option will fail.
+      If the folder c:\rubrik-mounts is not empty the script will exit.
+      This is necessary, because if a folder with the same name already exists, the mount option will fail.
       
       .NOTES
       Written by Pierre Flammer for community use (thanks to Mike Fal!)
