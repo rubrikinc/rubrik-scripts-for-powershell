@@ -2,7 +2,17 @@ param($csvfile
       ,$delimiter = '|'
       ,[int[]]$HistogramBins=@(1,10,100,500,1000))
 
-$rawdata = Get-Content $csvfile | ConvertFrom-Csv -Delimiter $delimiter
+$data = Get-Content $csvfile 
+
+if ($data[0].Substring(1,10) -ne "ServerName")
+{
+    $Header ="ServerName","SQLVersion","name","recovery_model_desc","SevenDayLogBackupMB","AverageFullMB","AverageFullTimeSec","AverageLogTimeSec","DBTotalSizeMB","AverageLogBackupInterval","ChangeCapture","Compression","FILESTREAM","InMemoryOLTP","Partitioning","TransparentDataEncryption"
+    $rawdata = Get-Content $csvfile | ConvertFrom-Csv -Delimiter $delimiter -Header $Header
+}
+else 
+{
+    $rawdata = Get-Content $csvfile | ConvertFrom-Csv -Delimiter $delimiter 
+}
 
 $DailyLogChurn = ($rawdata | Measure-Object -Property SevenDayLogBackupMB -Sum).Sum/7
 $EstimatedChangePerc = $DailyLogChurn/($rawdata | Where-Object {$_.recovery_model_desc -ne 'SIMPLE'} | Measure-Object -Property DBTotalSizeMB -Sum).Sum
@@ -16,6 +26,14 @@ $return = [ordered]@{
             'Avg Log Backup Time(Sec)' = ($rawdata | Where-Object {$_.recovery_model_desc -ne 'SIMPLE'} | Measure-Object -Property 'AverageLogTimeSec' -Average).Average.ToString('0.00')
             'Estimated Daily Change Rate (Perc)' = ($EstimatedChangePerc * 100).ToString('0.00')
             'Estimated Daily Change Rate (GB)' = ((($rawdata | Measure-Object -Property DBTotalSizeMB -Sum).Sum/1024) * $EstimatedChangePerc).ToString('0.00')
+            'Avg Lob Backup Interval (min)' =($rawdata | Where-Object {$_.recovery_model_desc -ne "SIMPLE"} | Measure-Object -Property 'AverageLogBackupInterval' -Average).Average.ToString('0.00')
+            'DBs with ChangeCapture' = ($rawdata | Measure-Object -Property 'ChangeCapture' -Sum).Sum
+            'DBs with Compression' = ($rawdata | Measure-Object -Property 'Compression' -Sum).Sum
+            'DBs with FILESTREAM' = ($rawdata | Measure-Object -Property 'FILESTREAM' -Sum).Sum
+            'DBs with InMemoryOLTP' = ($rawdata | Measure-Object -Property 'InMemoryOLTP' -Sum).Sum
+            'DBs with Partitioning' = ($rawdata | Measure-Object -Property 'Partitioning' -Sum).Sum
+            'DBs with TransparentDataEncryption' = ($rawdata | Measure-Object -Property 'TransparentDataEncryption' -Sum).Sum
+            
         }
 
 $BinStart = 0
@@ -28,4 +46,4 @@ foreach($bin in $HistogramBins){
 $BinCount = ($rawdata | Where-Object {[int]$_.DBTotalSizeMB/1024 -gt $BinStart} | Measure-Object).Count
 $return.Add("Histogram:More",$BinCount)
 
-return $return
+return $return | Format-Table -AutoSize

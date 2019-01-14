@@ -1,6 +1,6 @@
 ﻿[cmdletbinding()]
 param(
-    [string[]] $SQLInstance
+    [string[]] $SQLInstance 
     ,[string] $OutPath = [Environment]::GetFolderPath("MyDocuments")
     ,[string] $QueryPath = '.\'
     ,[Switch] $Anonymize
@@ -20,6 +20,14 @@ PROCESS
 {
     foreach($i in $SQLInstance)
     {
+        $svr = new-object "Microsoft.SqlServer.Management.Smo.Server" $i;
+        $svr.ConnectionContext.connectTimeout = 4
+        if ($svr.Edition -eq $null)
+        {
+            Write-Warning "!!!!!!! Can not connect to the SQL Service on: $i !!!!!!!"
+            $i | Out-File -FilePath (Join-Path -Path $OutPath -ChildPath "SizingQuery-ServerWeCouldNotConnectTo.txt") -Append
+            continue
+        }
         if($Anonymize)
         {
             $serverid = [guid]::NewGuid()
@@ -30,6 +38,7 @@ PROCESS
             if($Anonymize){$sql = $sql.Replace("@@SERVERNAME","'$serverid'")}
             $OutFile = Join-Path -Path $OutPath -ChildPath $q.filename
 
+            Write-Information "Collecting data from $i"
             if($SqlUser -and $SqlPassword)
             {
                 $output = Invoke-SqlCmd -ServerInstance "$i" -Database TempDB -Query "$sql" -Username $SqlUser -Password $SqlPassword
