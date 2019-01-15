@@ -28,6 +28,7 @@ $return = [ordered]@{
             'Estimated Daily Change Rate (GB)' = ((($rawdata | Measure-Object -Property DBTotalSizeMB -Sum).Sum/1024) * $EstimatedChangePerc).ToString('0.00')
             'Avg Lob Backup Interval (min)' =($rawdata | Where-Object {$_.recovery_model_desc -ne "SIMPLE"} | Measure-Object -Property 'AverageLogBackupInterval' -Average).Average.ToString('0.00')
             'DBs with ChangeCapture' = ($rawdata | Measure-Object -Property 'ChangeCapture' -Sum).Sum
+            'DBs with ColumnStoreIndex' = ($rawdata | Measure-Object -Property 'ColumnStoreIndex' -Sum).Sum
             'DBs with Compression' = ($rawdata | Measure-Object -Property 'Compression' -Sum).Sum
             'DBs with FILESTREAM' = ($rawdata | Measure-Object -Property 'FILESTREAM' -Sum).Sum
             'DBs with InMemoryOLTP' = ($rawdata | Measure-Object -Property 'InMemoryOLTP' -Sum).Sum

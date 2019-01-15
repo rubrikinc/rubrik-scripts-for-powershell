@@ -83,6 +83,7 @@ SELECT
 	,sum(mf.size/128.0) as DBTotalSizeMB
     ,AVG(lbii.BackupInterval) as AverageLogBackupInterval
 	,isnull(ef.ChangeCapture,0) as ChangeCapture
+	,isnull(ef.ColumnStoreIndex,0) as ColumnStoreIndex
 	,isnull(ef.[Compression],0) as Compression
 	,isnull(ef.[MultipleFSContainers],0) as FILESTREAM
 	,isnull(ef.[InMemoryOLTP], 0) as InMemoryOLTP
