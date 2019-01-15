@@ -35,6 +35,7 @@ function getEventsData([string]$rubrik_id){
 
     # If SQL, we can't filter events full vs transactional - get last 50 events then filter out by string checks
     # This may need tuned depending on number of transactional backups per DB
+    # 50 should cover an hourly transactional + 2x fulls for 48 hours
 
     if($rubrik_id.StartsWith('MssqlDatabase')){
         $result_size = '50'
@@ -51,9 +52,23 @@ function getEventsData([string]$rubrik_id){
 # Function to Get Last Successful Backup from Events - Today minus hours specified in $hours_to_check Variable
 function getLastSuccessBackup([string]$rubrik_id){
 
-    $formatted_endpoint = 'event?object_ids='+$rubrik_id+'&event_type=Backup&limit=1&status=Success&show_only_latest=true'
+    $formatted_endpoint = 'event?object_ids='+$rubrik_id+'&event_type=Backup&limit=20000&status=Success&show_only_latest=true'
     $last_success = Invoke-RubrikRESTCall -Endpoint $formatted_endpoint -Method GET -api "internal"
-    $info = $last_success.data.time
+
+    foreach($success in $last_success.data){
+        if($success.eventInfo.Contains('transaction log')){
+                
+            # Skip as transactional log backup successful
+            # Finding last Full DB Backup
+
+        } else {
+
+            $info = $success.time
+            break
+
+        }
+    }
+    
     return $info
 
 }
