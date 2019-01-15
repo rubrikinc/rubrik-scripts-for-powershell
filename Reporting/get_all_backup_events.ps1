@@ -23,7 +23,6 @@ $_PhyHost = $false
 
 # Declare Arrays for use
 $csv_data = @()
-$query_data = @()
 
 # Connect to Rubrik with Basic Auth
 Connect-Rubrik -Server $rubrik_ip -Username $rubrik_user -Password $(ConvertTo-SecureString -String $rubrik_pass -AsPlainText -Force) | Out-Null
@@ -52,7 +51,7 @@ function getEventsData([string]$rubrik_id){
 # Function to Get Last Successful Backup from Events - Today minus hours specified in $hours_to_check Variable
 function getLastSuccessBackup([string]$rubrik_id){
 
-    $formatted_endpoint = 'event?object_ids='+$rubrik_id+'&event_type=Backup&limit=1&after_date='+$date_iso_string+'&status=Success&show_only_latest=true'
+    $formatted_endpoint = 'event?object_ids='+$rubrik_id+'&event_type=Backup&limit=1&status=Success&show_only_latest=true'
     $last_success = Invoke-RubrikRESTCall -Endpoint $formatted_endpoint -Method GET -api "internal"
     $info = $last_success.data.time
     return $info
@@ -103,7 +102,7 @@ if($_VMConfig -eq $true){
             if($eventStatus -eq "Success"){
                 $info = "N/A"
             } elseif($info -eq $null){
-                $infoStr = "No Backup Found in the previous $($hours_to_check) Hours"
+                $infoStr = "No Successful Backup Found"
             } else {
                 $infoStr = "Last Successful Backup: $($info)"
             }
@@ -168,7 +167,7 @@ if($_MSSQLConfig -eq $true){
                 if($eventStatus -eq "Success"){
                     $info = "N/A"
                 } elseif($info -eq $null){
-                    $infoStr = "No Backup Found in the previous $($hours_to_check) Hours"
+                    $infoStr = "No Successful Backup Found"
                 } else {
                     $infoStr = "Last Successful Backup: $($info)"
                 }
@@ -235,7 +234,7 @@ if($_FilesetConfig -eq $true){
             if($eventStatus -eq "Success"){
                 $info = "N/A"
             } elseif($info -eq $null){
-                $infoStr = "No Backup Found in the previous $($hours_to_check) Hours"
+                $infoStr = "No Successful Backup Found"
             } else {
                 $infoStr = "Last Successful Backup: $($info)"
             }
@@ -297,7 +296,7 @@ if($_PhyHost -eq $true){
             if($eventStatus -eq "Success"){
                 $info = "N/A"
             } elseif($info -eq $null){
-                $infoStr = "No Backup Found in the previous $($hours_to_check) Hours"
+                $infoStr = "No Backup Found"
             } else {
                 $infoStr = "Last Successful Backup: $($info)"
             }
