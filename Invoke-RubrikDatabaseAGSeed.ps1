@@ -6,13 +6,11 @@
     Use Rubrik to seed Availability Group Replicas by using the Rubrik Log Shipping functionality that came out in v4.2
     
 .EXAMPLE
-    PS C:\> .\Rubrik-AGSeed.ps1 -RubrikServer 172.12.12.111 `
+    PS C:\> .\Invoke-RubikDatabaseAGSeed.ps1 -RubrikServer 172.12.12.111 `
         -DatabaseName "AthenaAM1-SQL16AG-1A-2016" `
         -SQLServerHost "AM1-SQL16AG-1A" `
         -SQLServerInstance "MSSQLSERVER" `
         -AGName "am1-sql16ag-2ag" `
-        -targetDataFilePath "F:\SQL\Data" `
-        -targetLogFilePath "F:\SQL\Log" `
         -RubrikCredentialFile "C:\Temp\Rubrik.cred"
 
     The above command will connect to the Rubrik Cluster of 172.12.12.111 and establish log shipping between AM1-SQL16AG-1a and the other replicas. Add the databases into the availability 
@@ -57,11 +55,11 @@ param
     [Parameter(Mandatory=$true)]
     [string]$AGName,
     
-    [Parameter(Mandatory=$true)]
-    [string]$targetDataFilePath,
+    #[Parameter(Mandatory=$false)]
+    #[string]$targetDataFilePath,
     
-    [Parameter(Mandatory=$true)]
-    [string]$targetLogFilePath,
+    #[Parameter(Mandatory=$false)]
+    #[string]$targetLogFilePath,
     
     [Parameter(Mandatory=$false)]
     [string]$RubrikCredentialFile = "C:\Temp\Rubrik.cred"
@@ -119,6 +117,7 @@ Connect-Rubrik -Server $RubrikServer -Credential $RubrikCredential
 #Get information about the database we will add to an availaility group
 Write-Debug "Getting information about $DatabaseName from $RubrikServer"
 $RubrikDatabase = Get-RubrikDatabase -Name $DatabaseName -Hostname $SQLServerHost -Instance $SQLServerInstance
+$SourceSQLInstance = Get-RubrikSQLInstance -Hostname $SQLServerHost -Name $SQLServerInstance  
 
 #Go to the primary replica and get the other replica servers
 $ServerInstance = $SQLServerHost
@@ -129,12 +128,12 @@ if ($SQLServerInstance.ToUpper() -ne "MSSQLSERVER")
 
 #Is the database already in an availability group?
 Write-Debug "Checking to see if database is not already in an Availability Group"
-$Query = "SELECT top 1 is_primary_replica 
+$Query = "SELECT top 1 database_id 
 FROM sys.dm_hadr_database_replica_states
 WHERE database_id = DB_ID('$($DatabaseName)')"
 $Groups = Invoke-Sqlcmd -ServerInstance $ServerInstance -Query $Query 
 
-if ([bool]($Groups.PSobject.Properties.name -match "is_primary_replica") -eq $true)
+if ([bool]($Groups.PSobject.Properties.name -match "database_id") -eq $true)
 {
     Write-Error "Database is already a member of an Availability Group"
     break
@@ -142,11 +141,22 @@ if ([bool]($Groups.PSobject.Properties.name -match "is_primary_replica") -eq $tr
 
 #What replicas are involved in the availbility group?
 Write-Debug "Getting replica servers involved in $AGName from $ServerInstance"
-$Query = "SELECT replica_server_name
-FROM [sys].[availability_groups] groups
-JOIN [sys].[availability_replicas] replicas
-ON groups.group_id = replicas.group_id
-WHERE groups.is_distributed = 0 AND name = '$($AGName)' " 
+If ($($SourceSQLInstance.Version).substring(0,$SourceSQLInstance.Version.indexOf(".")) -ge 13)
+{
+    $Query = "SELECT replica_server_name
+    FROM [sys].[availability_groups] groups
+    JOIN [sys].[availability_replicas] replicas
+    ON groups.group_id = replicas.group_id
+    WHERE groups.is_distributed = 0 AND name = '$($AGName)' " 
+}
+else 
+{
+    $Query = "SELECT replica_server_name
+    FROM [sys].[availability_groups] groups
+    JOIN [sys].[availability_replicas] replicas
+    ON groups.group_id = replicas.group_id
+    WHERE name = '$($AGName)' "  
+}
 $Replicas = Invoke-Sqlcmd -ServerInstance $ServerInstance -Query $Query 
 
 [System.Collections.ArrayList] $ReplicasInAG=@()
@@ -186,13 +196,17 @@ foreach ($Replica in $Replicas)
         }   
         else 
         {
+            $TargetFilePaths = Get-RubrikDatabaseFiles -Id $RubrikDatabase.id `
+                -RecoveryDateTime (Get-RubrikDatabase -id $RubrikDatabase.ID).latestRecoveryPoint | Select-Object LogicalName,@{n='exportPath';e={$_.OriginalPath}},@{n='newFilename';e={$_.OriginalName}} 
+
             Write-Debug "Setting up log shipping between $ServerInstance and $($Replica.replica_server_name)"
             $RubrikRequest = New-RubrikLogShipping -id $RubrikDatabase.id `
                 -targetInstanceId $TargetInstance.id `
                 -targetDatabaseName $DatabaseName `
                 -state "RESTORING" `
-                -targetDataFilePath $targetDataFilePath `
-                -targetLogFilePath $targetLogFilePath
+                -TargetFilePaths $TargetFilePaths 
+                #-targetDataFilePath $targetDataFilePath `
+                #-targetLogFilePath $targetLogFilePath
             $db | Add-Member -type NoteProperty -name RubrikRequest -Value $RubrikRequest
             $db | Add-Member -type NoteProperty -name Primary -Value $false
         }
