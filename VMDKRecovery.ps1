@@ -31,7 +31,7 @@
 #Requires -Modules Rubrik
 #Requires -RunAsAdministrator
 
-[CmdletBinding(SupportsShouldProcess = $true,ConfirmImpact = 'High')]
+[CmdletBinding()]
 param(
      [string]$SourceVM
     ,[parameter(Mandatory=$true)]
