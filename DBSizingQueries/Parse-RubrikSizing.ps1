@@ -37,6 +37,11 @@ $return = [ordered]@{
             
         }
 
+$MaxDbCountSingleHost = ($rawdata | Group-Object ServerName | Sort-Object Count -Descending| Select-Object Name, Count -first 1)
+if($MaxDbCountSingleHost.Count -gt 500){
+    $return.Add("Max DB count for a single host [$($MaxDbCountSingleHost.Name)]",$($MaxDbCountSingleHost.Count))
+}
+
 $BinStart = 0
 foreach($bin in $HistogramBins){
     $BinCount = ($rawdata | Where-Object {[int]$_.DBTotalSizeMB/1024 -gt $BinStart -and [int]$_.DBTotalSizeMB/1024 -le $bin} | Measure-Object).Count
