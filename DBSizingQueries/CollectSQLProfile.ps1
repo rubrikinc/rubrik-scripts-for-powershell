@@ -38,7 +38,7 @@ PROCESS
             if($Anonymize){$sql = $sql.Replace("@@SERVERNAME","'$serverid'")}
             $OutFile = Join-Path -Path $OutPath -ChildPath $q.filename
 
-            Write-Information "Collecting data from $i"
+            Write-Verbose "Collecting data from $i"
             if($SqlUser -and $SqlPassword)
             {
                 $output = Invoke-SqlCmd -ServerInstance "$i" -Database TempDB -Query "$sql" -Username $SqlUser -Password $SqlPassword
