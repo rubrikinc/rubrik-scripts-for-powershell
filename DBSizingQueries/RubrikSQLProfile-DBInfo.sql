@@ -26,38 +26,38 @@ WITH LogBackupInfo
 AS
 (
     SELECT database_name
-	    ,AVG(DATEDIFF(ss,backup_start_date,backup_finish_date)/1.0) as AverageLogBackupTime
-	    ,SUM(backup_size/1024.0/1024.0) as LogBackupTotalMB
+	    ,AVG(DATEDIFF(ss,backup_start_date,backup_finish_date)/1.0) AS AverageLogBackupTime
+	    ,SUM(backup_size/1024.0/1024.0) AS LogBackupTotalMB
     FROM msdb.dbo.backupset
-    WHERE type = 'l'
-	    and backup_finish_date > dateadd(dd,-7,GETDATE())
+    WHERE type = 'L'
+	    AND backup_finish_date > DATEADD(dd,-7,GETDATE())
     GROUP BY database_name
 ),
 FullBackupInfo 
 AS
 (
     SELECT database_name
-	    ,AVG(backup_size/1024.0/1024.0) as AverageBackupSizeMB
-	    ,AVG(DATEDIFF(ss,backup_start_date,backup_finish_date)/1.0) as AverageBackupTime
+	    ,AVG(backup_size/1024.0/1024.0) AS AverageBackupSizeMB
+	    ,AVG(DATEDIFF(ss,backup_start_date,backup_finish_date)/1.0) AS AverageBackupTime
     FROM msdb.dbo.backupset
-    WHERE type = 'd'
+    WHERE type = 'D'
     GROUP BY database_name
 ),
 LogBackupInterval
 AS
 (
-  SELECT database_name
-	    ,backup_start_date
-	    , LAG(backup_start_date, 1, backup_start_date) OVER (PARTITION BY database_name ORDER BY backup_start_date) AS PreviousBackupStartDate
-        , DATEDIFF(mi, LAG(backup_start_date, 1, backup_start_date) OVER (PARTITION BY database_name ORDER BY backup_start_date), backup_start_date) as BackupInterval
-    FROM msdb.dbo.backupset
-    WHERE type = 'l'
-	    and backup_start_date > dateadd(dd,-7,GETDATE())
+	SELECT a.database_name, a.backup_start_date, ISNULL( b.PrevBkpDate, a.backup_start_date ) PreviousBackupStartDate, DATEDIFF(mi,ISNULL( b.PrevBkpDate, a.backup_start_date ), a.backup_start_date) BackupInterval 
+	FROM msdb.dbo.backupset a 
+	OUTER APPLY (	SELECT TOP 1 backup_start_date AS  PrevBkpDate 
+					FROM msdb.dbo.backupset bb WHERE bb.database_guid = a.database_guid 
+						AND bb.type = a.type  AND bb.backup_start_date < a.backup_start_date and bb.backup_start_date > DATEADD(dd,-7,GETDATE()) ORDER BY bb.backup_start_date DESC) b
+					WHERE type = 'L'
+						AND backup_start_date > DATEADD(dd,-7,GETDATE())
 ),
 EnterpriseFeatures
 AS
 (
-	SELECT dbName as 'DatabaseName'
+	SELECT dbName AS 'DatabaseName'
 		,[ChangeCapture]
 		,[ColumnStoreIndex]
 		,[Compression]
@@ -68,27 +68,27 @@ AS
 	FROM 
 	(SELECT dbname, feature_name FROM   ##enterprise_features) e
 	PIVOT
-	( COUNT(feature_name) for feature_name IN ([ChangeCapture], [ColumnStoreIndex], [Compression], [MultipleFSContainers],[InMemoryOLTP],[Partitioning],[TransparentDataEncryption]) )
+	( COUNT(feature_name) FOR feature_name IN ([ChangeCapture], [ColumnStoreIndex], [Compression], [MultipleFSContainers],[InMemoryOLTP],[Partitioning],[TransparentDataEncryption]) )
 	AS PVT
 )
 SELECT
-	@@SERVERNAME as ServerName
-    ,SERVERPROPERTY('ProductVersion') as SQLVersion
+	@@SERVERNAME AS ServerName
+    ,SERVERPROPERTY('ProductVersion') AS SQLVersion
 	,db.name
 	,db.recovery_model_desc
-	,isnull(lbi.LogBackupTotalMB,0) as SevenDayLogBackupMB
-	,isnull(fbi.AverageBackupSizeMB,0) as AverageFullMB
-	,isnull(fbi.AverageBackupTime,0) as AverageFullTimeSec
-	,isnull(lbi.AverageLogBackupTime,0) as AverageLogTimeSec
-	,sum(mf.size/128.0) as DBTotalSizeMB
-    ,AVG(lbii.BackupInterval) as AverageLogBackupInterval
-	,isnull(ef.ChangeCapture,0) as ChangeCapture
-	,isnull(ef.ColumnStoreIndex,0) as ColumnStoreIndex
-	,isnull(ef.[Compression],0) as Compression
-	,isnull(ef.[MultipleFSContainers],0) as FILESTREAM
-	,isnull(ef.[InMemoryOLTP], 0) as InMemoryOLTP
-	,isnull(ef.[Partitioning],0) as Partitioning
-	,isnull(ef.[TransparentDataEncryption],0) as TransparentDataEncryption
+	,ISNULL(lbi.LogBackupTotalMB,0) AS SevenDayLogBackupMB
+	,ISNULL(fbi.AverageBackupSizeMB,0) AS AverageFullMB
+	,ISNULL(fbi.AverageBackupTime,0) AS AverageFullTimeSec
+	,ISNULL(lbi.AverageLogBackupTime,0) AS AverageLogTimeSec
+	,SUM(mf.size/128.0) AS DBTotalSizeMB
+    ,AVG(lbii.BackupInterval) AS AverageLogBackupInterval
+	,ISNULL(ef.ChangeCapture,0) AS ChangeCapture
+	,ISNULL(ef.ColumnStoreIndex,0) AS ColumnStoreIndex
+	,ISNULL(ef.[Compression],0) AS Compression
+	,ISNULL(ef.[MultipleFSContainers],0) AS FILESTREAM
+	,ISNULL(ef.[InMemoryOLTP], 0) AS InMemoryOLTP
+	,ISNULL(ef.[Partitioning],0) AS Partitioning
+	,ISNULL(ef.[TransparentDataEncryption],0) as TransparentDataEncryption
 FROM sys.databases db
 JOIN sys.master_files mf ON db.database_id = mf.database_id
 LEFT OUTER JOIN LogBackupInfo lbi ON db.name = lbi.database_name
@@ -99,15 +99,15 @@ WHERE db.database_id != 2
  --   AND lbii.PreviousBackupStartDate <> '1900-01-01 00:00:00.000'
 GROUP BY db.name
 	,db.recovery_model_desc
-	,isnull(lbi.LogBackupTotalMB,0)
-	,isnull(fbi.AverageBackupSizeMB,0)
-	,isnull(fbi.AverageBackupTime,0)
-	,isnull(lbi.AverageLogBackupTime,0)
-	,isnull(ef.ChangeCapture,0)
-	,isnull(ef.[ColumnStoreIndex],0)
-	,isnull(ef.[Compression],0)
-	,isnull(ef.[MultipleFSContainers],0)
-	,isnull(ef.[InMemoryOLTP],0)
-	,isnull(ef.[Partitioning],0)
-	,isnull(ef.[TransparentDataEncryption],0)
+	,ISNULL(lbi.LogBackupTotalMB,0)
+	,ISNULL(fbi.AverageBackupSizeMB,0)
+	,ISNULL(fbi.AverageBackupTime,0)
+	,ISNULL(lbi.AverageLogBackupTime,0)
+	,ISNULL(ef.ChangeCapture,0)
+	,ISNULL(ef.[ColumnStoreIndex],0)
+	,ISNULL(ef.[Compression],0)
+	,ISNULL(ef.[MultipleFSContainers],0)
+	,ISNULL(ef.[InMemoryOLTP],0)
+	,ISNULL(ef.[Partitioning],0)
+	,ISNULL(ef.[TransparentDataEncryption],0)
 ORDER BY name
