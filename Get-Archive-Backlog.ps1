@@ -82,11 +82,6 @@
 
 #>
 
-[CmdletBinding(
-    DefaultParameterSetName='Auto'
-)]
-
-
 param(
     [parameter(Mandatory=$false, HelpMessage="Maximum age (days) of an archive to query for.")]
     [int] $MaxAge,
