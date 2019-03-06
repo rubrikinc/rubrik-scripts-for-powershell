@@ -14,7 +14,7 @@ Get-Help Get-RubrikRequest -ShowWindow
 
 #Connect to Rubrik
 $cred = Get-Credential
-Connect-Rubrik 172.21.8.31-Credential $cred
+Connect-Rubrik 172.21.8.31 -Credential $cred
 
 #create credential file
 $cred | Export-Clixml C:\temp\RubrikCred.xml -Force
