@@ -70,7 +70,19 @@ AS
 	PIVOT
 	( COUNT(feature_name) FOR feature_name IN ([ChangeCapture], [ColumnStoreIndex], [Compression], [MultipleFSContainers],[InMemoryOLTP],[Partitioning],[TransparentDataEncryption]) )
 	AS PVT
+), 
+DBInfo
+AS
+(
+	select 
+		db.name
+		, sum(mf.size * 8 /1024) DBTotalSizeMB
+
+	FROM sys.databases db
+	JOIN sys.master_files mf ON db.database_id = mf.database_id
+	group by db.name
 )
+
 SELECT
 	@@SERVERNAME AS ServerName
     ,SERVERPROPERTY('ProductVersion') AS SQLVersion
@@ -80,7 +92,7 @@ SELECT
 	,ISNULL(fbi.AverageBackupSizeMB,0) AS AverageFullMB
 	,ISNULL(fbi.AverageBackupTime,0) AS AverageFullTimeSec
 	,ISNULL(lbi.AverageLogBackupTime,0) AS AverageLogTimeSec
-	,SUM(mf.size/128.0) AS DBTotalSizeMB
+	,dbinfo.DBTotalSizeMB
     ,AVG(lbii.BackupInterval) AS AverageLogBackupInterval
 	,ISNULL(ef.ChangeCapture,0) AS ChangeCapture
 	,ISNULL(ef.ColumnStoreIndex,0) AS ColumnStoreIndex
@@ -90,7 +102,7 @@ SELECT
 	,ISNULL(ef.[Partitioning],0) AS Partitioning
 	,ISNULL(ef.[TransparentDataEncryption],0) as TransparentDataEncryption
 FROM sys.databases db
-JOIN sys.master_files mf ON db.database_id = mf.database_id
+JOIN DBInfo on db.name = dbinfo.name
 LEFT OUTER JOIN LogBackupInfo lbi ON db.name = lbi.database_name
 LEFT OUTER JOIN FullBackupInfo fbi ON db.name = fbi.database_name
 LEFT OUTER JOIN LogBackupInterval lbii ON db.name = lbii.database_name
@@ -99,6 +111,7 @@ WHERE db.database_id != 2
  --   AND lbii.PreviousBackupStartDate <> '1900-01-01 00:00:00.000'
 GROUP BY db.name
 	,db.recovery_model_desc
+	,dbinfo.DBTotalSizeMB
 	,ISNULL(lbi.LogBackupTotalMB,0)
 	,ISNULL(fbi.AverageBackupSizeMB,0)
 	,ISNULL(fbi.AverageBackupTime,0)
@@ -111,3 +124,6 @@ GROUP BY db.name
 	,ISNULL(ef.[Partitioning],0)
 	,ISNULL(ef.[TransparentDataEncryption],0)
 ORDER BY name
+
+
+--exec sp_helpdb @dbname = 'AdventureWorks2012'
