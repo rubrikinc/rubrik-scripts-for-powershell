@@ -30,11 +30,9 @@
       .EXAMPLE
       .\VolumeRecovery.ps1 -TargetServer 'DEMO-EXCH10-1' -RubrikCluster 172.17.28.15 
       Execute the Recovery script locally.
-
       .EXAMPLE
       .\VolumeRecovery.ps1 -TargetServer 'DEMO-EXCH10-1' -RubrikCluster 172.17.28.15 -DrivesToExclude C,D
       Execute the script locally and but don't mount Drive C & D from TargetServer
-
   #>
 
 #Requires -Modules Rubrik
@@ -70,7 +68,8 @@ $reqdate = Read-Host 'Enter desired snapshot date (yyyy-mm-dd)'
 
 #Collect Snaps from the last 24 hours
 #Want a date range, show backups between 
-$snaps = Get-RubrikVolumeGroup -Name $TargetServer | Get-RubrikSnapshot | Where-Object {((get-date $_.date).Date -eq $reqdate)} | Sort-Object Date -Descending | Select-Object 
+#$snaps = Get-RubrikVolumeGroup -Name $TargetServer | Get-RubrikSnapshot | Where-Object {((get-date $_.date).Date -eq $reqdate)} | Sort-Object Date -Descending | Select-Object 
+$snaps = Get-RubrikVolumeGroup | Where hostname -eq $TargetServer | Get-RubrikSnapshot | Where-Object {((get-date $_.date).Date -eq $reqdate)} | Sort-Object Date -Descending | Select-Object 
 
 #Exit if now snapshots where found
 if (-not ($snaps)) {
@@ -88,7 +87,7 @@ $Snaps  | ForEach-Object -Begin {$i=0} -Process {"SnapID $i - $(get-date $_.Date
 $selection = Read-Host 'Enter ID of selected snapshot'
 
 #Mount all Volumes to Kroll/Target Server from selected Snapshot
-$result = New-RubrikVolumeGroupMount -TargetHost $KrollServer -VolumeGroupSnapshot $snaps[$selection] -ExcludeDrives $DrivestoExclude
+$result = New-RubrikVolumeGroupMount -TargetHost $KrollServer -VolumeGroupSnapshot $snaps[$selection] -ExcludeDrives $DrivestoExclude 
 
 
 #Output asking to cleanup after themselves
@@ -102,4 +101,4 @@ do {
 } until ($input -eq "remove")
 
 #remove mounts from TargetHost to KrollServer
-Get-RubrikVolumeGroupMount -source_host $TargetServer | Where-Object {$_.targetHostName -eq $KrollServer} | Remove-RubrikVolumeGroupMount
+Get-RubrikVolumeGroupMount -source_host $TargetServer | Where-Object {$_.targetHostName -eq $KrollServer} | Remove-RubrikVolumeGroupMount 
