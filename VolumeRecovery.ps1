@@ -87,7 +87,7 @@ $Snaps  | ForEach-Object -Begin {$i=0} -Process {"SnapID $i - $(get-date $_.Date
 $selection = Read-Host 'Enter ID of selected snapshot'
 
 #Mount all Volumes to Kroll/Target Server from selected Snapshot
-$result = New-RubrikVolumeGroupMount -TargetHost $KrollServer -VolumeGroupSnapshot $snaps[$selection] -ExcludeDrives $DrivestoExclude 
+$result = New-RubrikVolumeGroupMount -TargetHost $KrollServer -VolumeGroupSnapshot $snaps[$selection] -ExcludeDrives $DrivestoExclude -Confirm:$false
 
 
 #Output asking to cleanup after themselves
@@ -101,4 +101,4 @@ do {
 } until ($input -eq "remove")
 
 #remove mounts from TargetHost to KrollServer
-Get-RubrikVolumeGroupMount -source_host $TargetServer | Where-Object {$_.targetHostName -eq $KrollServer} | Remove-RubrikVolumeGroupMount 
+Get-RubrikVolumeGroupMount -source_host $TargetServer | Where-Object {$_.targetHostName -eq $KrollServer} | Remove-RubrikVolumeGroupMount -Confirm:$false
