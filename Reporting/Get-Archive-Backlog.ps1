@@ -1,4 +1,4 @@
-<#
+4<#
     .SYNOPSIS
         Will look for snapshots that have not been archived with in the archive threshold. 
 
@@ -37,9 +37,24 @@
         None
 
     .NOTES
-        Name:       Cloud Cluster Expander 
-        Created:    02/26/2019
-        Author:     Damani Norman
+        Name:       Archive Backlog 
+        Created:    01/14/2019
+        Author:     Tim Haynes
+        Updated:    02/28/2019
+        Updater:    Damani Norman
+        Updates:
+
+        1. Improved the output formatting and fields
+        2. Made the clusters that are included in the report selectable
+        3. Made it query the SLAs and report based on the actual On Brik slider
+        4. Made it query either selected or all SLAs.
+        5. Made it only report on SLAs that have archiving enabled.
+        6. Gave an option to filer on snapshot age so older snapshots could be filtered out. 
+        7. Filtered out some false positives like Snapshots that didn't have an SLA assigned. 
+        8. Added support for Hyper-V VMs, Nutanix VMs.
+        9. Broke out NAS vs OS based systems from Filesets.
+        10. Added check and inclusion of empty cloudStates
+
         Execution Process:
 
             1. Install the Rubrik PowerShell Module
@@ -67,11 +82,7 @@
 
 #>
 
-[CmdletBinding(
-    DefaultParameterSetName='Auto'
-)]
-
-param(   
+param(
     [parameter(Mandatory=$false, HelpMessage="Maximum age (days) of an archive to query for.")]
     [int] $MaxAge,
 
