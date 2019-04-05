@@ -1,7 +1,7 @@
 #
 # Name:     get_archive_report.ps1
 # Author:   pmilano1 (Peter J. Milanese)
-# Use case: Basic report on failed backups for the last 24 hours
+# Use case: Report last completed archival of snap by object
 # Ex: .\get_archive_report.ps1 -rubrik [FDQN|IP Address for Rubrik Cluster] [-SLA [sla1,sla2,sla3]]
 
 param (
