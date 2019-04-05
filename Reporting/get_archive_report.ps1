@@ -55,12 +55,9 @@ New-Item -ItemType Directory -Force -Path "$($PSScriptRoot)\.creds" | out-null
 $Credential = ''
 $CredentialFile = "$($PSScriptRoot)\.creds\$($rubrik).cred"
 if (Test-Path $CredentialFile){
-  write-host "Credentials found for $($rubrik)"
   $Credential = Import-CliXml -Path $CredentialFile
 }
 else {
-  write-host "$($CredentialFile) not found"
-  $Credential = Get-Credential -Message "Credentials not found for $($rubrik), please enter them now."
   $Credential | Export-CliXml -Path $CredentialFile
 }
 
