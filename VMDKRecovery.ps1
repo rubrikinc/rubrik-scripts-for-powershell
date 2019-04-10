@@ -77,14 +77,13 @@ if ($PSBoundParameters.ContainsKey('AllDisks')) {
     $mode += 2
 }
 
-#Mount Volumes to Kroll/Target Server from selected Snapshot
+#Mount Disks to Kroll/Target Server from selected Snapshot
 switch ($mode) {
     0{$result = New-RubrikVMDKMount -TargetVM $TargetVM -snapshotid $snaps[$selection].id}
     1{$result = New-RubrikVMDKMount -TargetVM $TargetVM -snapshotid $snaps[$selection].id -VLAN $VLAN}
     2{$result = New-RubrikVMDKMount -TargetVM $TargetVM -snapshotid $snaps[$selection].id -AllDisks}
     3{$result = New-RubrikVMDKMount -TargetVM $TargetVM -snapshotid $snaps[$selection].id -VLAN $VLAN -AllDisks}
 }
-
 
 #Output asking to cleanup after themselves
 "`n--------------------------------" | Out-Host
@@ -100,4 +99,4 @@ do {
 #remove mounts from TargetHost to KrollServer
 $TargetVMID = Get-RubrikVM -name $TargetVM
 #$SourceVMID = Get-RubrikVM -name $SourceVM
-Get-RubrikMount | Where-Object {$_.mountedVmId -eq $TargetVMID.id} | Remove-RubrikMount
+Get-RubrikMount | Where-Object {$_.mountedVmId -eq $TargetVMID.id} | Remove-RubrikMount -Confirm:$false

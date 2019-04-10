@@ -89,10 +89,18 @@ $selection = Read-Host 'Enter ID of selected snapshot'
 #Mount all Volumes to Kroll/Target Server from selected Snapshot
 $result = New-RubrikVolumeGroupMount -TargetHost $KrollServer -VolumeGroupSnapshot $snaps[$selection] -ExcludeDrives $DrivestoExclude -Confirm:$false
 
+#Mount is in process
+"`n--------------------------------" | Out-Host
+$directoryInfo = Get-ChildItem c:\rubrik-mounts\ | Measure-Object
+while ($directoryInfo.count -eq 0) {
+    start-sleep 3
+    "The mount was initialized. Please wait..." | Out-Host
+    $directoryInfo = Get-ChildItem c:\rubrik-mounts\ | Measure-Object
+}
 
 #Output asking to cleanup after themselves
 "`n--------------------------------" | Out-Host
-"The Volume Group will be mounted on the Host in about a minute." | Out-Host
+"The Volume Group was mounted on Host " + $TargetServer | Out-Host
 "After you are done restoring, close Kroll Software and enter remove." | Out-Host
 "This will clean up the created volume group mounts" | Out-Host
 
