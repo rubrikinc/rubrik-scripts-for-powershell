@@ -43,6 +43,10 @@ Full path and file name of the credential file to be used to authenticate to the
 Name of the SLA Domain to be applied to this backup. If no SLAName is provided, then we will use the current assigned
 SLA Domain on the database
 
+.PARAMETER ExcludeReadOnly
+Exlcude databases that are in a read only state in SQL Server
+
+
 .EXAMPLE
 Backup all databases on an instance of SQL Server. Will NOT backup databaess on the instance that are in the availability group
 .\Start-RubrikDBBackup.ps1 -RubrikServer 172.256.256.256 `
