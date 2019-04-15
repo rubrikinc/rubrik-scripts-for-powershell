@@ -1,10 +1,10 @@
 <#
 .SYNOPSIS
-Start-RubrikDBBackup is used to run full backups against a set of databases on an instance of SQL
+Start-RubrikDBLogBackup is used to run transaction log backups against a set of databases on an instance of SQL
 
 .DESCRIPTION
-Based on parameters supplied, Start-RubrikDBBackup will be used to backup All databases, all User databases, all system 
-databases, a list of specific databases. This script will kick off an async request in Rubrik for a new snapshot of each 
+Based on parameters supplied, Start-RubrikDBLogBackup will be used to backup All databases, all User databases, all system 
+databases, or a list of specific databases. This script will kick off an async request in Rubrik for a new snapshot of each 
 database. The script will then wait for all databases to complete, and return back an object with each database and their 
 respective success/failure status.
 
@@ -107,11 +107,9 @@ Backup databases with a specific SLA Domain
     -SLAName "Gold"
 
 .NOTES
-Name:               Start Rubrik Database Backup
-Created:            05/23/2018
+Name:               Start Rubrik Database Log Backup
+Created:            04/18/2019
 Author:             Chris Lumnah
-Updated:            4/8/2019
-                    Script has been rewritten to allow for backups of a availability group. 
 Execution Process:
     Before running this script, you need to create a credential file so that you can securly log into the Rubrik 
     Cluster. To do so run the below command via Powershell
@@ -254,7 +252,10 @@ switch ($true) {
     }   
 }            
 #endregion
-
+If($RubrikDatabases.measure.count -eq 0){
+    Write-Host "No databases found to backup" -ForegroundColor Red
+    break
+}
 #region Take data from returned from Rubrik and build a queue so we can monitor the backup prgress
 [System.Collections.ArrayList] $DatabasesToBeBackedUp = @()
 foreach ($RubrikDatabase in $RubrikDatabases) {
@@ -264,6 +265,7 @@ foreach ($RubrikDatabase in $RubrikDatabases) {
     $db | Add-Member -type NoteProperty -name ServerInstance -Value $SQLServerInstance
     $db | Add-Member -type NoteProperty -name AvailabilityGroup -Value $AvailabilityGroupName
     $db | Add-Member -type NoteProperty -name RubrikRequest -Value ""
+    $db | Add-Member -type NoteProperty -name LatestRecoveryPoint -Value ""
     
     $db | Add-Member -type NoteProperty -name RubrikSLADomain -Value $RubrikDatabase.effectiveSlaDomainName
     if (-not ([string]::IsNullOrEmpty($SLAName))) {
@@ -278,7 +280,6 @@ foreach ($RubrikDatabase in $RubrikDatabases) {
     }
     $DatabasesToBeBackedUp += $db
 }
-$DatabasesToBeBackedUp
 #endregion
 
 if ($ExcludeReadOnly) {
@@ -292,7 +293,7 @@ if ($ExcludeReadOnly) {
 #Kick off the backup of each database
 foreach ($Database in $DatabasesToBeBackedUp | Where-Object { $_.Exclude -eq $false }) {
     Write-Host "Starting Backup of $($Database.name)"
-    $RubrikRequest = New-RubrikSnapshot -id $Database.id -SLA $Database.RubrikSLADomain -Confirm:$false 
+    $RubrikRequest = New-RubrikLogBackup -id $Database.id 
     $Database.RubrikRequest = $RubrikRequest
 }
 
@@ -302,5 +303,8 @@ foreach ($Database in $DatabasesToBeBackedUp | Where-Object { $_.Exclude -eq $fa
     $RubrikRequestInfo = Get-RubrikRequestInfo -RubrikRequest $Database.RubrikRequest -Type mssql
     $Database.RubrikRequest = $RubrikRequestInfo
 }
-
+#Get the Latest Recovery Point of each db
+foreach ($Database in $DatabasesToBeBackedUp | Where-Object { $_.Exclude -eq $false }) {
+    $Database.LatestRecoveryPoint =     (Get-RubrikDatabase -id $Database.ID).latestRecoveryPoint.DateTime
+}
 Return $DatabasesToBeBackedUp
