@@ -26,16 +26,19 @@ Server to install the Rubrik Backup Service On
 #>
 
 param(
+    # Parameter help description
     [Parameter(Mandatory=$false)]
     [string]$RubrikCluster,
     
+    # Parameter help description
     [Parameter(Mandatory=$false)]
-    [string]$OutFile,
+    [string]$OutFile = "c:\temp\RubrikBackupService.zip",
 
-    [Parameter(Mandatory=$true)]
+    # Parameter help description
+    [Parameter(Mandatory=$false)]
     [String]$ComputerName
 )
-$OutputPath = ".\MOF"
+$OutputPath = ".\MOF\"
 #region Download the Rubrik Connector 
 $url =  "https://$($RubrikCluster)/connector/RubrikBackupService.zip"
 
@@ -50,14 +53,8 @@ add-type @"
         }
     }
 "@
-
-
-[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 [System.Net.ServicePointManager]::CertificatePolicy = New-Object TrustAllCertsPolicy
-if (Test-Path -Path $OutFile)
-{
-    Remove-Item -Path $OutFile -Force
-}
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 Invoke-WebRequest -Uri $url -OutFile $OutFile
 #endregion
 
@@ -150,3 +147,9 @@ Start-DscConfiguration  -ComputerName $ComputerName -Path $OutputPath -Verbose -
 
 Get-Service -Name "Rubrik Backup Service" -ComputerName $ComputerName | Stop-Service 
 Get-Service -Name "Rubrik Backup Service" -ComputerName $ComputerName | Start-Service
+
+#Add the host to Rubrik 
+Import-Module Rubrik
+Connect-Rubrik -Server $RubrikCluster | Out-Null
+
+New-RubrikHost -Name $ComputerName -Confirm:$false
