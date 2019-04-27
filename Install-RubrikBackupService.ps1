@@ -26,18 +26,50 @@ Server to install the Rubrik Backup Service On
 #>
 
 param(
-    # Parameter help description
-    [Parameter(Mandatory=$false)]
+    # Rubrik Cluster name or ip address
+    [Parameter(Mandatory=$true)]
     [string]$RubrikCluster,
     
-    # Parameter help description
+    # Computer(s) that should have the Rubrik Backup Service installed onto and then added into Rubrik
+    [Parameter(Mandatory=$true)]
+    [String[]]$ComputerName,
+
+    # Credential to run the Rubrik Backup Service on the Computer
     [Parameter(Mandatory=$false)]
-    [string]$OutFile = "c:\temp\RubrikBackupService.zip",
+    [pscredential]$RBSCredential,
+
+    # Credential to log into Rubrik Cluster
+    [Parameter(Mandatory=$false)]
+    [pscredential]$RubrikCredential,
 
     # Parameter help description
     [Parameter(Mandatory=$false)]
-    [String]$ComputerName
+    [string]$OutFile = "c:\temp\RubrikBackupService.zip"
+
+    
 )
+
+if ($RBSCredential){
+    $RubrikServiceAccount = $RBSCredential    
+}
+else{
+    $RubrikServiceAccount = Get-Credential -UserName "$($env:UserDomain)\Rubrik$" -Message "Enter user name and password for the service account that will run the Rubrik Backup Service"
+}
+
+
+if ($RubrikCredential){
+    $RubrikConnection = @{
+        Server = $RubrikCluster
+        Credential = $RubrikCredential
+    }
+}
+else{
+    $RubrikConnection = @{
+        Server = $RubrikCluster
+        Credential = Get-Credential -Message "Enter user name and password for your Rubrik Cluster"
+    }
+}
+
 $OutputPath = ".\MOF\"
 #region Download the Rubrik Connector 
 $url =  "https://$($RubrikCluster)/connector/RubrikBackupService.zip"
@@ -58,47 +90,14 @@ add-type @"
 Invoke-WebRequest -Uri $url -OutFile $OutFile
 #endregion
 
-#region Push the RubrikBackupService.zip to remote computer
-if (Test-Path -Path $OutFile)
-{
-    $Destination = "\\$($ComputerName)\C$\Temp\" #RubrikBackupService.zip"
-    if (!(test-path -path $Destination))
-    {
-        New-Item -Path $Destination -ItemType Directory
-    }
-    $Destination = "\\$($ComputerName)\C$\Temp\RubrikBackupService.zip"
-    Copy-Item -Path $OutFile -Destination $Destination -Force
-}
-#endregion
-
-#region Unzip the RubrikBackupService on the remote computer
-$Session = New-PSSession -ComputerName $ComputerName
-Enter-PSSession -Session $Session
-
-Expand-Archive -LiteralPath $OutFile -DestinationPath "\\$($ComputerName)\C$\Temp\RubrikBackupService" -Force
-
-Exit-PSSession
-#endregion
-
-#region Install the RBS on the Remote Computer
-Invoke-Command -ComputerName $ComputerName -ScriptBlock {
-    Start-Process -FilePath "C:\Temp\RubrikBackupService\RubrikBackupService.msi" -ArgumentList "/quiet" -Wait
-}
-#endregion
-
-configuration RubrikService
-{
-  param( 
-	    [Parameter(Mandatory=$true)] 
-	    [String]$Server
-	  ) 
-	
-
+configuration RubrikService{
+    param( 
+        [Parameter(Mandatory=$true)] 
+        [String]$Server
+    ) 
     Import-DscResource -ModuleName PSDesiredStateConfiguration
-    Node $Server
-    {
-        ServiceSet Rubrik
-        {
+    Node $Server{
+        ServiceSet Rubrik{
             Name        = "Rubrik Backup Service"
             StartupType = "Automatic"
             State       = "Running"
@@ -107,15 +106,13 @@ configuration RubrikService
     }
 }
 
-configuration LocalAdministrators
-{
+configuration LocalAdministrators{
     param( 
 	    [Parameter(Mandatory=$true)] 
 	    [String]$Server
-	  ) 
+	) 
     Import-DscResource -ModuleName PSDesiredStateConfiguration
-    Node $Server
-    {
+    Node $Server{
         GroupSet LocalAdminTest
         {
             GroupName        = "Administrators"
@@ -125,31 +122,62 @@ configuration LocalAdministrators
     }
 }
 
-
-$ConfigurationData = @{
-    AllNodes = @(
-        @{
-            NodeName = $ComputerName
-            PSDscAllowPlainTextPassword = $true
-            PSDscAllowDomainUser =$true
-            RubrikServiceAccount = Get-Credential -UserName "$($env:UserDomain)\Rubrik$" -Message "Credentials to run Rubrik Backup Service As"
+foreach($Computer in $ComputerName){
+    $Computer
+    #region Push the RubrikBackupService.zip to remote computer
+    if (Test-Path -Path $OutFile)
+    {
+        $Destination = "\\$($Computer)\C$\Temp\" #RubrikBackupService.zip"
+        if (!(test-path -path $Destination))
+        {
+            New-Item -Path $Destination -ItemType Directory
         }
-    )
+        $Destination = "\\$($Computer)\C$\Temp\RubrikBackupService.zip"
+        Copy-Item -Path $OutFile -Destination $Destination -Force
+    }
+    #endregion
+
+    #region Unzip the RubrikBackupService on the remote computer
+    $Session = New-PSSession -ComputerName $Computer
+    Enter-PSSession -Session $Session
+
+    Expand-Archive -LiteralPath $OutFile -DestinationPath "\\$($Computer)\C$\Temp\RubrikBackupService" -Force
+
+    Exit-PSSession
+    #endregion
+
+    #region Install the RBS on the Remote Computer
+    Invoke-Command -ComputerName $Computer -ScriptBlock {
+        Start-Process -FilePath "C:\Temp\RubrikBackupService\RubrikBackupService.msi" -ArgumentList "/quiet" -Wait
+    }
+    #endregion
+
+    $ConfigurationData = @{
+        AllNodes = @(
+            @{
+                NodeName = $Computer
+                PSDscAllowPlainTextPassword = $true
+                PSDscAllowDomainUser =$true
+                RubrikServiceAccount = $RubrikServiceAccount
+            }
+        )
+    }
+
+    #Configure the Local Administrators
+    LocalAdministrators -Server $Computer -ConfigurationData $ConfigurationData -OutputPath $OutputPath 
+    Start-DscConfiguration  -ComputerName $Computer -Path $OutputPath -Verbose -Wait -Force
+
+    #Configure the Rubrik Backup Service
+    RubrikService -Server $Computer -ConfigurationData $ConfigurationData -OutputPath $OutputPath 
+    Start-DscConfiguration  -ComputerName $Computer -Path $OutputPath -Verbose -Wait -Force
+
+    Get-Service -Name "Rubrik Backup Service" -ComputerName $Computer | Stop-Service 
+    Get-Service -Name "Rubrik Backup Service" -ComputerName $Computer | Start-Service
+
+    #Add the host to Rubrik 
+    Import-Module Rubrik
+    Connect-Rubrik @RubrikConnection | Out-Null
+
+    New-RubrikHost -Name $Computer -Confirm:$false
+
 }
-
-#Configure the Local Administrators
-LocalAdministrators -Server $ComputerName -ConfigurationData $ConfigurationData -OutputPath $OutputPath 
-Start-DscConfiguration  -ComputerName $ComputerName -Path $OutputPath -Verbose -Wait -Force
-
-#Configure the Rubrik Backup Service
-RubrikService -Server $ComputerName -ConfigurationData $ConfigurationData -OutputPath $OutputPath 
-Start-DscConfiguration  -ComputerName $ComputerName -Path $OutputPath -Verbose -Wait -Force
-
-Get-Service -Name "Rubrik Backup Service" -ComputerName $ComputerName | Stop-Service 
-Get-Service -Name "Rubrik Backup Service" -ComputerName $ComputerName | Start-Service
-
-#Add the host to Rubrik 
-Import-Module Rubrik
-Connect-Rubrik -Server $RubrikCluster | Out-Null
-
-New-RubrikHost -Name $ComputerName -Confirm:$false
