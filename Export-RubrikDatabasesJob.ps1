@@ -233,13 +233,13 @@ if (Test-Path -Path $JobFile) {
     foreach ($Export in $Exports.keys) {
         Write-Verbose ("Export is: $Export")
         $ExportStatus = ""
-        while ($ExportStatus.status -notin "SUCCEEDED", "FAILED") {
+        while ($ExportStatus.status -notin "SUCCEEDED", "FAILED", "FINISHING") {
             $ExportStatus = Get-RubrikRequest -id $Exports.$Export -Type mssql
             Write-Verbose ("ExportStatus is: $ExportStatus")
             Write-Host ("SQL Restore job for database " + $Export + " is " + $ExportStatus.status + ", progress: " + $ExportStatus.progress )
             #Start-Sleep 5
         }
-        if ($ExportStatus.status -match "SUCCEEDED") {
+        if ($ExportStatus.status -in "SUCCEEDED", "FINISHING") {
             Write-Host ("SQL Restore of $Export " + $ExportStatus.status)
         } else {
             Write-Error ("SQL Restore of $Export " + $ExportStatus.status)
