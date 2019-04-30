@@ -7,11 +7,38 @@ $data = Get-Content $csvfile
 if ($data[0].Substring(1,10) -ne "ServerName")
 {
     $Header ="ServerName","SQLVersion","name","recovery_model_desc","SevenDayLogBackupMB","AverageFullMB","AverageFullTimeSec","AverageLogTimeSec","DBTotalSizeMB","AverageLogBackupInterval","ChangeCapture","Compression","FILESTREAM","InMemoryOLTP","Partitioning","TransparentDataEncryption"
-    $rawdata = Get-Content $csvfile | ConvertFrom-Csv -Delimiter $delimiter -Header $Header
+    $rawdataOrig = Get-Content $csvfile | ConvertFrom-Csv -Delimiter $delimiter -Header $Header
 }
 else 
 {
-    $rawdata = Get-Content $csvfile | ConvertFrom-Csv -Delimiter $delimiter 
+    $rawdataOrig = Get-Content $csvfile | ConvertFrom-Csv -Delimiter $delimiter 
+}
+
+#preparing the variable for European or US decimal separator
+$rawdata=@()
+foreach ($record in $rawdataOrig){
+  $parsingRecords = New-Object PSObject -Property @{    
+    ServerName       = $record.ServerName
+    SQLVersion       = $record.SQLVersion
+    name             = $record.name
+    recovery_model_desc = $record.recovery_model_desc
+    SevenDayLogBackupMB = ($record.SevenDayLogBackupMB).Replace(",",".")
+    AverageFullMB       = ($record.AverageFullMB).Replace(",",".")
+    AverageFullTimeSec  = ($record.AverageFullTimeSec).Replace(",",".")
+    AverageLogTimeSec   = ($record.AverageLogTimeSec).Replace(",",".")
+    DBTotalSizeMB       = ($record.DBTotalSizeMB).Replace(",",".")
+    AverageLogBackupInterval = ($record.AverageLogBackupInterval).Replace(",",".")
+    ChangeCapture       = $record.ChangeCapture
+    ColumnStoreIndex    = $record.ColumnStoreIndex
+    Compression         = $record.Compression
+    FILESTREAM          = $record.FILESTREAM
+    InMemoryOLTP        = $record.InMemoryOLTP
+    Partitioning        = $record.Partitioning
+    TransparentDataEncryption = $record.TransparentDataEncryption
+  }
+
+  #Add data to array
+  $rawdata += $parsingRecords
 }
 
 $DailyLogChurn = ($rawdata | Measure-Object -Property SevenDayLogBackupMB -Sum).Sum/7
@@ -21,7 +48,7 @@ $return = [ordered]@{
             'DB Count' = ($rawdata | Measure-Object).Count
             'DBs in Full' = ($rawdata | Where-Object {$_.recovery_model_desc -ne 'SIMPLE'} | Measure-Object).Count
             'Server Count' =  ($rawdata | Group-Object -Property ServerName | Measure-Object).Count
-            'Total DB Size (GB)' = (($rawdata | Measure-Object -Property DBTotalSizeMB -Sum)./1024).ToString('0.00')
+            'Total DB Size (GB)' = (($rawdata | Measure-Object -Property DBTotalSizeMB -Sum).Sum/1024).ToString('0.00')
             'Avg Full Backup Time(Sec)' = ($rawdata | Measure-Object -Property 'AverageFullTimeSec' -Average).Average.ToString('0.00')
             'Avg Log Backup Time(Sec)' = ($rawdata | Where-Object {$_.recovery_model_desc -ne 'SIMPLE'} | Measure-Object -Property 'AverageLogTimeSec' -Average).Average.ToString('0.00')
             'Estimated Daily Change Rate (Perc)' = ($EstimatedChangePerc * 100).ToString('0.00')
