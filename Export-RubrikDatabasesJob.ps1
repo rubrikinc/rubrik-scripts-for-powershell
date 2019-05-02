@@ -88,9 +88,6 @@ param(
     $JobFile = ".\Export-RubrikDatabasesJobFile.json"
 )
 
-$Now = get-date
-$Exports = @{}
-
 Import-Module Rubrik
 
 if (Test-Path -Path $JobFile) {
@@ -101,54 +98,94 @@ if (Test-Path -Path $JobFile) {
     Write-Host("Connecting to Rubrik cluster node $($JobFile.RubrikCluster.Server)...")
     try 
     {
-        Get-RubrikVersion | Out-Null
+        $RubrikVersion = Get-RubrikVersion | Out-Null
     }
     catch 
     {
-        #04/05/2018 - Chris Lumnah - Instead of using an encrypted text file, I am now using the more standard
-        #CLiXml method
-        $Credential = Import-CliXml -Path $JobFIle.RubrikCluster.Credential
-        Connect-Rubrik -Server $JobFile.RubrikCluster.Server -Credential $Credential
-    }
+        switch($true){
+            {$JobFile.RubrikCluster.Token}{
+                $RubrikConnection = @{
+                    Server = $JobFile.RubrikCluster.Server
+                    Token = $JobFile.RubrikCluster.Token
+                }
+            }
+            {$Jobfile.RubrikCluster.Credential}{
+                $RubrikConnection = @{
+                    Server = $JobFile.RubrikCluster.Server
+                    Credential = Import-CliXml -Path $JobFIle.RubrikCluster.Credential
+                }
+            }
+            default{
+                $RubrikConnection = @{
+                    Server = $JobFile.RubrikCluster.Server
+                }
+            }
+        }
 
+        Connect-Rubrik @RubrikConnection
+    }
+    
     foreach ($Database in $JobFile.Databases) {
-        if ($Database.SourceIsAG -eq $true) 
-        {
-            $RubrikDatabase = Get-RubrikDatabase -Name $Database.Name -Hostname $Database.SourceHostName 
+        switch($true){
+            {$Database.Source.AvailabilityGroupName}{
+                $GetRubrikDatabase = @{
+                    HostName = $Database.Source.AvailabilityGroupName
+                    Name = $Database.Source.Name
+                }
+            }
+            {$Database.Source.ServerInstance}{
+                $GetRubrikDatabase = @{
+                    HostName = $Database.Source.ServerInstance
+                    Name = $Database.Source.Name
+                }
+            }
+            {$Database.Source.WindowsCluster}{
+                $GetRubrikDatabase = @{
+                    HostName = $Database.Source.WindowsCluster
+                    Name = $Database.Source.Name
+                }
+            }
         }
-        else 
-        {    
-            $RubrikDatabase = Get-RubrikDatabase -Name $Database.Name -Hostname $Database.SourceHostName -Instance $Database.SourceInstance
-        }
-      
+        $RubrikDatabase = Get-RubrikDatabase @GetRubrikDatabase | Where-Object { $_.isRelic -eq $false -and $_.isLivemount -eq $false }
+
         #Added test to see if Get-RubrikDatabase found anything. Now, if database is not found in Rubrik, we will exit the script
         if ([bool]($RubrikDatabase.PSobject.Properties.name -match "name") -eq $false)
         {
-            Write-Error "Database $($Database.Name) on $($Database.SourceHostName)\$($Database.SourceInstance) was not found"
+            Write-Error "Database $($Database.Source.Name) on $($Database.Source.ServerInstance) was not found"
             exit
         }
         
         #Create a hash table containing all of the files for the database. 
         $TargetFiles = @()
-        foreach ($DatabaseFile in $JobFile.Databases.Files)
+        foreach ($DatabaseFile in $Database.Target.Files)
         {
                 $TargetFiles += @{logicalName=$DatabaseFile.logicalName;exportPath=$DatabaseFile.Path;newFilename=$DatabaseFile.FileName}       
         }
-
-        $TargetServerInstance = $Database.TargetHostName
-        if ($Database.TargetInstance -ne "MSSQLSERVER")
-        {
-            $TargetServerInstance = "$($Database.TargetHostName)\$($Database.TargetInstance)"
+        $TargetFiles
+        switch($true){
+            {$Database.Target.ServerInstance}{
+                $GetRubrikDatabase = @{
+                    HostName = $Database.Target.ServerInstance
+                    Name = $Database.Target.Name
+                }
+            }
+            {$Database.Target.WindowsCluster}{
+                $GetRubrikDatabase = @{
+                    HostName = $Database.Target.WindowsCluster
+                    Name = $Database.Target.Name
+                }
+            }
         }
-
+break
+#based on version, allow for overwrite, otherwise drop database and refresh. 
         #We look for the existence of the database on the target instance. If it exists, we must drop the database before we can 
         #proceed with exportation of the database to the target instance.
 
-        $DatabaseName = $Database.Name
-        if ($Database.TargetDatabaseName){$DatabaseName = $Database.TargetDatabaseName}
+        $DatabaseName = $Database.Source.Name
+        if ($Database.Target.Name){$DatabaseName = $Database.Target.Name}
 
         $Query = "SELECT state_desc FROM sys.databases WHERE name = '" + $DatabaseName + "'" 
-        $Results = Invoke-Sqlcmd -ServerInstance $TargetServerInstance -Query $Query
+        $Results = Invoke-Sqlcmd -ServerInstance $Database.Target.ServerInstance -Query $Query
 
         if ([bool]($Results.PSobject.Properties.name -match "state_desc") -eq $true)
         {
@@ -157,18 +194,18 @@ if (Test-Path -Path $JobFile) {
                 Write-Host "Setting $($DatabaseName) to SINGLE_USER"
                 Write-Host "Dropping $($DatabaseName)"
                 $Query = "ALTER DATABASE [" + $DatabaseName + "] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; `nDROP DATABASE [" + $DatabaseName + "]"
-                $Results = Invoke-Sqlcmd -ServerInstance $TargetServerInstance -Query $Query
+                $Results = Invoke-Sqlcmd -ServerInstance $Database.Target.ServerInstance -Query $Query
             }
             else 
             {
                 Write-Host "Dropping $($DatabaseName)"
                 $Query = "DROP DATABASE [" + $DatabaseName + "]"
-                $Results = Invoke-Sqlcmd -ServerInstance $TargetServerInstance -Query $Query -Database master
+                $Results = Invoke-Sqlcmd -ServerInstance $Database.Target.ServerInstance -Query $Query -Database master
             }
         }
         
         #Refresh Rubik so it does not think the database still exists
-        Write-Host "Refreshing $($Database.TargetHostName) in Rubrik"
+        Write-Host "Refreshing $($Database.TargettName) in Rubrik"
         New-RubrikHost -Name $Database.TargetHostName -Confirm:$false | Out-Null
         
         $TargetInstance = (Get-RubrikSQLInstance -Hostname $Database.TargetHostName -Instance $Database.TargetInstance)
@@ -249,56 +286,3 @@ if (Test-Path -Path $JobFile) {
 } 
 
 
-<# 
-In case the JSON file is deleted, you can use the below as an example to recreate the file. 
-
-{
-    "RubrikCluster":
-    {
-        "Server": "172.21.8.31",
-        "Credential":"C:\\Users\\chrislumnah\\OneDrive\\Documents\\WindowsPowerShell\\Credentials\\RangerLab-AD.credential"
-
-    },
-    "Databases":
-    [ 
-        {
-            "Name": "AdventureWorks2016",
-            "RestoreTime": "latest",
-            "SourceServerInstance": "cl-sql2016n1.rangers.lab",
-            "TargetServerInstance": "cl-sql2016n2.rangers.lab",
-            "Files":
-            [
-                {
-                    "LogicalName":"AdventureWorks2016_Data",
-                    "Path":"E:\\Microsoft SQL Server\\MSSQL13.MSSQLSERVER\\MSSQL\\DATA\\",
-                    "FileName":"AdventureWorks2016_Data.mdf"
-                },
-                {
-                    "LogicalName":"AdventureWorks2016_Log",
-                    "Path":"E:\\Microsoft SQL Server\\MSSQL13.MSSQLSERVER\\MSSQL\\DATA\\",
-                    "FileName":"AdventureWorks2016_Log.ldf"
-                }
-            ]
-        },
-        {
-            "Name": "AdventureWorksDW2016",
-            "RestoreTime": "02:00",
-            "SourceServerInstance": "cl-sql2016n1.rangers.lab",
-            "TargetServerInstance": "cl-sql2016n2.rangers.lab",
-            "Files":
-            [
-                {
-                    "LogicalName":"AdventureWorksDW2016_Data",
-                    "Path":"E:\\Microsoft SQL Server\\MSSQL13.MSSQLSERVER\\MSSQL\\DATA\\",
-                    "FileName":"AdventureWorksDW2016_Data.mdf"
-                },
-                {
-                    "LogicalName":"AdventureWorksDW2016_Log",
-                    "Path":"E:\\Microsoft SQL Server\\MSSQL13.MSSQLSERVER\\MSSQL\\DATA\\",
-                    "FileName":"AdventureWorksDW2016_Log.ldf"
-                }
-            ]
-        }
-    ]  
-}
-#>

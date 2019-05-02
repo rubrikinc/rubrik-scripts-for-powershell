@@ -1,56 +1,61 @@
 {
-    "RubrikCluster":
-    {
-        "Server": "172.21.8.51",
-        "Credential":"C:\\temp\\Rubrik.cred"
+    "RubrikCluster": {
+      "Server": "amer1-rbk01-a.rubrikdemo.com",
+      "Credential": "C:\\temp\\Rubrik.cred",
+      "Token": "token"
     },
-    "Databases":
-    [ 
-        {
-            "Name": "AdventureWorks2016",
-            "SourceIsAG": true,
-            "SourceHostName": "AG1",
-            "SourceInstance":"RUBRIK",
-            "TargetHostName": "cl-sql2016n2.rangers.lab",
-            "TargetInstance": "MSSQLSERVER",
-            "TargetDatabaseName":"TestDB_1",
-            "RestoreTime": "latest",
-            "Files":
-            [
-                {
-                    "LogicalName":"AdventureWorks2016_Data",
-                    "Path":"E:\\Microsoft SQL Server\\MSSQL13.MSSQLSERVER\\MSSQL\\DATA",
-                    "FileName":"AdventureWorks2016_Test_Data.mdf"
-                },
-                {
-                    "LogicalName":"AdventureWorks2016_Log",
-                    "Path":"E:\\Microsoft SQL Server\\MSSQL13.MSSQLSERVER\\MSSQL\\DATA",
-                    "FileName":"AdventureWorks2016_Test_Log.ldf"
-                }
-            ]
+    "Databases": [
+      {
+        "Source": {
+          "AvailabilityGroupName": "am1-sql16ag-1ag",
+          "ServerInstance": "",
+          "WindowsCluster": "am1-sql16fc-1",
+          "InstanceName":"",
+          "Name": "AdventureWorks2016"
         },
-        {
-            "Name": "AdventureWorks",
-            "SourceIsAG": false,
-            "SourceHostName": "cl-sql2016n1.rangers.lab",
-            "SourceInstance":"MSSQLSERVER",
-            "TargetHostName": "cl-sql2016n2.rangers.lab",
-            "TargetInstance": "MSSQLSERVER",
-            "TargetDatabaseName":"TestDB_2",
-            "RestoreTime": "latest",
-            "Files":
-            [
-                {
-                    "LogicalName":"AdventureWorks2014_Data",
-                    "Path":"E:\\Microsoft SQL Server\\MSSQL13.MSSQLSERVER\\MSSQL\\DATA",
-                    "FileName":"AdventureWorks_Test_Data.mdf"
-                },
-                {
-                    "LogicalName":"AdventureWorks2014_Log",
-                    "Path":"E:\\Microsoft SQL Server\\MSSQL13.MSSQLSERVER\\MSSQL\\DATA",
-                    "FileName":"AdventureWorks_Test_Log.ldf"
-                }
-            ]
+        "Target": {
+          "ServerInstance": "",
+          "WindowsCluster":"am1-sql16fc-1",
+          "Name": "",
+          "RecoveryPoint": "",
+          "Files": [
+            {
+              "LogicalName": "AdventureWorks2014_Data",
+              "Path": "E:\\Microsoft SQL Server\\MSSQL13.MSSQLSERVER\\MSSQL\\DATA",
+              "FileName": "AdventureWorks_Test_Data.mdf"
+            },
+            {
+              "LogicalName": "AdventureWorks2014_Log",
+              "Path": "E:\\Microsoft SQL Server\\MSSQL13.MSSQLSERVER\\MSSQL\\DATA",
+              "FileName": "AdventureWorks_Test_Log.ldf"
+            }
+          ]
         }
-    ]  
-}
+      },
+      {
+        "Source": {
+          "AvailabilityGroupName": "",
+          "ServerInstance": "",
+          "Cluster": "Not sure sure if this is required yet.",
+          "Name": "AdventureWorks2016"
+        },
+        "Target": {
+          "ServerInstance": "",
+          "Name": "",
+          "RecoveryPoint": "",
+          "Files": [
+            {
+              "LogicalName": "AdventureWorks2014_Data",
+              "Path": "E:\\Microsoft SQL Server\\MSSQL13.MSSQLSERVER\\MSSQL\\DATA",
+              "FileName": "AdventureWorks_Test_Data.mdf"
+            },
+            {
+              "LogicalName": "AdventureWorks2014_Log",
+              "Path": "E:\\Microsoft SQL Server\\MSSQL13.MSSQLSERVER\\MSSQL\\DATA",
+              "FileName": "AdventureWorks_Test_Log.ldf"
+            }
+          ]
+        }
+      }
+    ]
+  }
