@@ -17,8 +17,8 @@ Import-Module Rubrik
 # Replace variables here:
 $rubrik_cluster = 'rubrik.demo.com'
 $rubrik_user = 'admin'
-$rubrik_pass = 'MyP@ss123!'
-$output_type = 'text' # enter 'html' for an html report, 'csv' for a CSV based-report, or 'text' for a plain text report
+$rubrik_pass = 'Mypass123!'
+$output_type = 'csv' # enter 'html' for an html report, 'csv' for a CSV based-report, or 'text' for a plain text report
 $output_folder = '.' # this can be modified to 'C:\temp' or whatever is required, leave as '.' to write to script path, do not include trailing slash on folder path
 # Do not change anything after this point
 # Set up web headers for certain API calls
@@ -39,13 +39,13 @@ foreach ($rk_sla in $rk_all_slas) {
     $this_sla_object = @{}
     $this_sla_object['name'] = $rk_sla.name
     $this_sla_object['frequencies'] = $rk_sla.frequencies
-    if ($rk_sla.replicationSpecs -ne $null) {
+    if ($rk_sla.replicationSpecs) {
         $this_sla_object['replication'] = @{}
         $rep_target_info = Invoke-WebRequest -Uri $("https://"+$rubrik_cluster+"/api/internal/replication/target/"+$rk_sla.replicationSpecs.locationId) -Headers $headers -Method GET
         $this_sla_object['replication']['target'] = $($rep_target_info.Content | ConvertFrom-Json).targetClusterName
         $this_sla_object['replication']['retention'] = $rk_sla.replicationSpecs.retentionLimit
     }
-    if ($rk_sla.archivalSpecs -ne $null) {
+    if ($rk_sla.archivalSpecs) {
         $this_sla_object['archive'] = @{}
         $archive_locations = Invoke-WebRequest -Uri $("https://"+$rubrik_cluster+"/api/internal/archive/location") -Headers $headers -Method GET
         $archive_locations = $($archive_locations.Content | ConvertFrom-Json).data
@@ -85,37 +85,77 @@ if ($output_type -eq 'text') {
         Write-Output "Retention Settings:" | Tee-Object -FilePath $output_file_name -Append
         $retention_output = @()
         $retention_output | Select-Object -Property Take,Keep
-        if ($sla_domain.frequencies.timeUnit.Contains("Hourly")) {
-            $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Hourly"
-            $this_policy = New-Object PSObject
-            $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($policy.frequency) Hour(s)"
-            $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($policy.retention / 24) Day(s)"
-            $retention_output += $this_policy
+        $cluster_version = $rk_connection | Where-Object {$_.Name -eq 'version'} | Select-Object -ExpandProperty Value
+        if ($cluster_version.split('.')[0] -lt 5) {
+            if ($sla_domain.frequencies.timeUnit.Contains("Hourly")) {
+                $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Hourly"
+                $this_policy = New-Object PSObject
+                $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($policy.frequency) Hour(s)"
+                $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($policy.retention / 24) Day(s)"
+                $retention_output += $this_policy
+            }
+            if ($sla_domain.frequencies.timeUnit.Contains("Daily")) {
+                $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Daily"
+                $this_policy = New-Object PSObject
+                $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($policy.frequency) Day(s)"
+                $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($policy.retention) Day(s)"
+                $retention_output += $this_policy
+            }
+            if ($sla_domain.frequencies.timeUnit.Contains("Monthly")) {
+                $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Monthly"
+                $this_policy = New-Object PSObject
+                $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($policy.frequency) Month(s)"
+                $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($policy.retention) Month(s)"
+                $retention_output += $this_policy
+            }
+            if ($sla_domain.frequencies.timeUnit.Contains("Yearly")) {
+                $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Yearly"
+                $this_policy = New-Object PSObject
+                $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($policy.frequency) Year(s)"
+                $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($policy.retention) Year(s)"
+                $retention_output += $this_policy
+            }
+        } else {
+            if ($sla_domain.frequencies.hourly) {
+                $this_policy = New-Object PSObject
+                $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($sla_domain.frequencies.hourly.frequency) Hour(s)"
+                $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($sla_domain.frequencies.hourly.retention / 24) Day(s)"
+                $retention_output += $this_policy
+            }
+            if ($sla_domain.frequencies.daily) {
+                $this_policy = New-Object PSObject
+                $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($sla_domain.frequencies.daily.frequency) Day(s)"
+                $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($sla_domain.frequencies.daily.retention) Day(s)"
+                $retention_output += $this_policy
+            }
+            if ($sla_domain.frequencies.weekly) {
+                $this_policy = New-Object PSObject
+                $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($sla_domain.frequencies.weekly.frequency) Week(s)"
+                $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($sla_domain.frequencies.weekly.retention) Week(s)"
+                $retention_output += $this_policy
+            }
+            if ($sla_domain.frequencies.monthly) {
+                $this_policy = New-Object PSObject
+                $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($sla_domain.frequencies.monthly.frequency) Month(s)"
+                $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($sla_domain.frequencies.monthly.retention) Month(s)"
+                $retention_output += $this_policy
+            }
+            if ($sla_domain.frequencies.quarterly) {
+                $this_policy = New-Object PSObject
+                $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($sla_domain.frequencies.quarterly.frequency) Quarter(s)"
+                $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($sla_domain.frequencies.quarterly.retention / 4) Year(s)"
+                $retention_output += $this_policy
+            }
+            if ($sla_domain.frequencies.yearly) {
+                $this_policy = New-Object PSObject
+                $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($sla_domain.frequencies.yearly.frequency) Year(s)"
+                $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($sla_domain.frequencies.yearly.retention) Year(s)"
+                $retention_output += $this_policy
+            }
         }
-        if ($sla_domain.frequencies.timeUnit.Contains("Daily")) {
-            $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Daily"
-            $this_policy = New-Object PSObject
-            $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($policy.frequency) Day(s)"
-            $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($policy.retention) Day(s)"
-            $retention_output += $this_policy
-        }
-        if ($sla_domain.frequencies.timeUnit.Contains("Monthly")) {
-            $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Monthly"
-            $this_policy = New-Object PSObject
-            $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($policy.frequency) Month(s)"
-            $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($policy.retention / 12) Year(s)"
-            $retention_output += $this_policy
-        }
-        if ($sla_domain.frequencies.timeUnit.Contains("Yearly")) {
-            $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Yearly"
-            $this_policy = New-Object PSObject
-            $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($policy.frequency) Year(s)"
-            $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($policy.retention) Year(s)"
-            $retention_output += $this_policy
-        }
-        Write-Output $($retention_output | ft) | Tee-Object -FilePath $output_file_name -Append
+        Write-Output $($retention_output | Format-Table) | Tee-Object -FilePath $output_file_name -Append
         Write-Output "Archival Settings:" | Tee-Object -FilePath $output_file_name -Append
-        if ($sla_domain.archive -ne $null) {
+        if ($sla_domain.archive) {
             if ($sla_domain.archive.instantArchive -eq 1) {
                 if (0 -eq $sla_domain.archive.retentionOnBrik % 31536000 -and $sla_domain.archive.retentionOnBrik -eq 1) {
                     Write-Output "The SLA domain is archived to $($sla_domain.archive.target) with Instant Archive enabled, and is kept on the local cluster for $($sla_domain.archive.retentionOnBrik / 31536000) years" | Tee-Object -FilePath $output_file_name -Append
@@ -134,7 +174,7 @@ if ($output_type -eq 'text') {
         }
         Write-Output "" | Tee-Object -FilePath $output_file_name -Append
         Write-Output "Replication Settings:" | Tee-Object -FilePath $output_file_name -Append
-        if ($sla_domain.replication -ne $null) {
+        if ($sla_domain.replication) {
             if (0 -eq $sla_domain.replication.retention % 31536000) {
                 Write-Output "The SLA domain is replicated to $($sla_domain.replication.target), and is kept on the remote cluster for $($sla_domain.replication.retention / 31536000) years" | Tee-Object -FilePath $output_file_name -Append
             } else {
@@ -199,38 +239,77 @@ TD {border-width: 1px; padding: 3px; border-style: solid; border-color: black; f
         $output_html += "<p><b>Name: </b>$($sla_domain.name)</p>"
         $output_html += "<p><b>Retention Settings:</b></p>"
         $retention_output = @()
-        $retention_output | Select-Object -Property Take,Keep
-        if ($sla_domain.frequencies.timeUnit.Contains("Hourly")) {
-            $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Hourly"
-            $this_policy = New-Object PSObject
-            $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($policy.frequency) Hour(s)"
-            $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($policy.retention / 24) Day(s)"
-            $retention_output += $this_policy
-        }
-        if ($sla_domain.frequencies.timeUnit.Contains("Daily")) {
-            $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Daily"
-            $this_policy = New-Object PSObject
-            $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($policy.frequency) Day(s)"
-            $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($policy.retention) Day(s)"
-            $retention_output += $this_policy
-        }
-        if ($sla_domain.frequencies.timeUnit.Contains("Monthly")) {
-            $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Monthly"
-            $this_policy = New-Object PSObject
-            $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($policy.frequency) Month(s)"
-            $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($policy.retention / 12) Year(s)"
-            $retention_output += $this_policy
-        }
-        if ($sla_domain.frequencies.timeUnit.Contains("Yearly")) {
-            $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Yearly"
-            $this_policy = New-Object PSObject
-            $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($policy.frequency) Year(s)"
-            $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($policy.retention) Year(s)"
-            $retention_output += $this_policy
+        $cluster_version = $rk_connection | Where-Object {$_.Name -eq 'version'} | Select-Object -ExpandProperty Value
+        if ($cluster_version.split('.')[0] -lt 5) {
+            if ($sla_domain.frequencies.timeUnit.Contains("Hourly")) {
+                $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Hourly"
+                $this_policy = New-Object PSObject
+                $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($policy.frequency) Hour(s)"
+                $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($policy.retention / 24) Day(s)"
+                $retention_output += $this_policy
+            }
+            if ($sla_domain.frequencies.timeUnit.Contains("Daily")) {
+                $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Daily"
+                $this_policy = New-Object PSObject
+                $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($policy.frequency) Day(s)"
+                $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($policy.retention) Day(s)"
+                $retention_output += $this_policy
+            }
+            if ($sla_domain.frequencies.timeUnit.Contains("Monthly")) {
+                $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Monthly"
+                $this_policy = New-Object PSObject
+                $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($policy.frequency) Month(s)"
+                $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($policy.retention) Month(s)"
+                $retention_output += $this_policy
+            }
+            if ($sla_domain.frequencies.timeUnit.Contains("Yearly")) {
+                $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Yearly"
+                $this_policy = New-Object PSObject
+                $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($policy.frequency) Year(s)"
+                $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($policy.retention) Year(s)"
+                $retention_output += $this_policy
+            }
+        } else {
+            if ($sla_domain.frequencies.hourly) {
+                $this_policy = New-Object PSObject
+                $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($sla_domain.frequencies.hourly.frequency) Hour(s)"
+                $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($sla_domain.frequencies.hourly.retention / 24) Day(s)"
+                $retention_output += $this_policy
+            }
+            if ($sla_domain.frequencies.daily) {
+                $this_policy = New-Object PSObject
+                $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($sla_domain.frequencies.daily.frequency) Day(s)"
+                $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($sla_domain.frequencies.daily.retention) Day(s)"
+                $retention_output += $this_policy
+            }
+            if ($sla_domain.frequencies.weekly) {
+                $this_policy = New-Object PSObject
+                $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($sla_domain.frequencies.weekly.frequency) Week(s)"
+                $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($sla_domain.frequencies.weekly.retention) Week(s)"
+                $retention_output += $this_policy
+            }
+            if ($sla_domain.frequencies.monthly) {
+                $this_policy = New-Object PSObject
+                $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($sla_domain.frequencies.monthly.frequency) Month(s)"
+                $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($sla_domain.frequencies.monthly.retention) Month(s)"
+                $retention_output += $this_policy
+            }
+            if ($sla_domain.frequencies.quarterly) {
+                $this_policy = New-Object PSObject
+                $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($sla_domain.frequencies.quarterly.frequency) Quarter(s)"
+                $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($sla_domain.frequencies.quarterly.retention / 4) Year(s)"
+                $retention_output += $this_policy
+            }
+            if ($sla_domain.frequencies.yearly) {
+                $this_policy = New-Object PSObject
+                $this_policy | Add-Member -type NoteProperty -Name 'Take' -Value "Every $($sla_domain.frequencies.yearly.frequency) Year(s)"
+                $this_policy | Add-Member -type NoteProperty -Name 'Keep' -Value "for $($sla_domain.frequencies.yearly.retention) Year(s)"
+                $retention_output += $this_policy
+            }
         }
         $output_html += $($retention_output | ConvertTo-Html -Fragment)
         $output_html += "<p><b>Archival Settings:</b></p>"
-        if ($sla_domain.archive -ne $null) {
+        if ($sla_domain.archive) {
             if ($sla_domain.archive.instantArchive -eq 1) {
                 if (0 -eq $sla_domain.archive.retentionOnBrik % 31536000 -and $sla_domain.archive.instantArchive -eq 1) {
                     $output_html += "<p>The SLA domain is archived to $($sla_domain.archive.target) with Instant Archive enabled, and is kept on the local cluster for $($sla_domain.archive.retentionOnBrik / 31536000) years</p>"
@@ -248,7 +327,7 @@ TD {border-width: 1px; padding: 3px; border-style: solid; border-color: black; f
             $output_html += "<p>(none)</p>"
         }
         $output_html += "<p><b>Replication Settings:</b></p>"
-        if ($sla_domain.replication -ne $null) {
+        if ($sla_domain.replication) {
             if (0 -eq $sla_domain.replication.retention % 31536000) {
                 $output_html += "<p>The SLA domain is replicated to $($sla_domain.replication.target), and is kept on the remote cluster for $($sla_domain.replication.retention / 31536000) years</p>"
             } else {
@@ -299,25 +378,47 @@ if ($output_type -eq 'csv') {
     $output_csv = @()
     $output_array = @()
     foreach ($sla_domain in $output_object) {
-        $row = '' | select name,cluster,timedate,policy_hourly,policy_daily,policy_monthly,policy_yearly,archival_location,archival_instant,archival_local_retention,replication_location,replication_target_retention,protected_vms,protected_dbs,protected_filesets
+        $row = '' | Select-Object name,cluster,timedate,policy_hourly,policy_daily,policy_weekly,policy_monthly,policy_quarterly,policy_yearly,archival_location,archival_instant,archival_local_retention,replication_location,replication_target_retention,protected_vms,protected_dbs,protected_filesets
         $row.name = $sla_domain.name
         $row.cluster = $rubrik_cluster
         $row.timedate = $(Get-Date)
-        if ($sla_domain.frequencies.timeUnit.Contains("Hourly")) {
-            $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Hourly"
-            $row.policy_hourly = "Take every $($policy.frequency) Hour(s), keep for $($policy.retention / 24) Day(s)"
-        }
-        if ($sla_domain.frequencies.timeUnit.Contains("Daily")) {
-            $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Daily"
-            $row.policy_daily = "Take every $($policy.frequency) Day(s), keep for $($policy.retention) Day(s)"
-        }
-        if ($sla_domain.frequencies.timeUnit.Contains("Monthly")) {
-            $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Monthly"
-            $row.policy_monthly = "Take every $($policy.frequency) Month(s), keep for $($policy.retention / 12) Year(s)"
-        }
-        if ($sla_domain.frequencies.timeUnit.Contains("Yearly")) {
-            $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Yearly"
-            $row.policy_yearly = "Take every $($policy.frequency) Year(s), keep for $($policy.retention) Year(s)"
+        $cluster_version = $rk_connection | Where-Object {$_.Name -eq 'version'} | Select-Object -ExpandProperty Value
+        if ($cluster_version.split('.')[0] -lt 5) {
+            if ($sla_domain.frequencies.timeUnit.Contains("Hourly")) {
+                $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Hourly"
+                $row.policy_hourly = "Take every $($policy.frequency) Hour(s), keep for $($policy.retention / 24) Day(s)"
+            }
+            if ($sla_domain.frequencies.timeUnit.Contains("Daily")) {
+                $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Daily"
+                $row.policy_daily = "Take every $($policy.frequency) Day(s), keep for $($policy.retention) Day(s)"
+            }
+            if ($sla_domain.frequencies.timeUnit.Contains("Monthly")) {
+                $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Monthly"
+                $row.policy_monthly = "Take every $($policy.frequency) Month(s), keep for $($policy.retention) Month(s)"
+            }
+            if ($sla_domain.frequencies.timeUnit.Contains("Yearly")) {
+                $policy = $sla_domain.frequencies | Where-Object -Property timeUnit -eq "Yearly"
+                $row.policy_yearly = "Take every $($policy.frequency) Year(s), keep for $($policy.retention) Year(s)"
+            }
+        } else {
+            if ($sla_domain.frequencies.hourly) {
+                $row.policy_hourly = "Take every $($sla_domain.frequencies.hourly.frequency) Hour(s), keep for $($sla_domain.frequencies.hourly.retention / 24) Day(s)"
+            }
+            if ($sla_domain.frequencies.daily) {
+                $row.policy_daily = "Take every $($sla_domain.frequencies.daily.frequency) Day(s), keep for $($sla_domain.frequencies.daily.retention) Day(s)"
+            }
+            if ($sla_domain.frequencies.weekly) {
+                $row.policy_weekly = "Take every $($sla_domain.frequencies.weekly.frequency) Week(s), keep for $($sla_domain.frequencies.weekly.retention) Week(s)"
+            }
+            if ($sla_domain.frequencies.monthly) {
+                $row.policy_monthly = "Take every $($sla_domain.frequencies.monthly.frequency) Month(s), keep for $($sla_domain.frequencies.monthly.retention) Month(s)"
+            }
+            if ($sla_domain.frequencies.quarterly) {
+                $row.policy_quarterly = "Take every $($sla_domain.frequencies.quarterly.frequency) Quarter(s), keep for $($sla_domain.frequencies.quarterly.retention / 4) Year(s)"
+            }
+            if ($sla_domain.frequencies.yearly) {
+                $row.policy_yearly = "Take every $($sla_domain.frequencies.yearly.frequency) Year(s), keep for $($sla_domain.frequencies.yearly.retention) Year(s)"
+            }
         }
         if ($sla_domain.archive.target) {
             $row.archival_location = $sla_domain.archive.target
