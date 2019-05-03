@@ -1,61 +1,36 @@
 {
-    "RubrikCluster": {
-      "Server": "amer1-rbk01-a.rubrikdemo.com",
-      "Credential": "C:\\temp\\Rubrik.cred",
-      "Token": "token"
-    },
-    "Databases": [
-      {
-        "Source": {
-          "AvailabilityGroupName": "am1-sql16ag-1ag",
-          "ServerInstance": "",
-          "WindowsCluster": "am1-sql16fc-1",
-          "InstanceName":"",
-          "Name": "AdventureWorks2016"
-        },
-        "Target": {
-          "ServerInstance": "",
-          "WindowsCluster":"am1-sql16fc-1",
-          "Name": "",
-          "RecoveryPoint": "",
-          "Files": [
-            {
-              "LogicalName": "AdventureWorks2014_Data",
-              "Path": "E:\\Microsoft SQL Server\\MSSQL13.MSSQLSERVER\\MSSQL\\DATA",
-              "FileName": "AdventureWorks_Test_Data.mdf"
-            },
-            {
-              "LogicalName": "AdventureWorks2014_Log",
-              "Path": "E:\\Microsoft SQL Server\\MSSQL13.MSSQLSERVER\\MSSQL\\DATA",
-              "FileName": "AdventureWorks_Test_Log.ldf"
-            }
-          ]
-        }
+  "RubrikCluster": {
+    "Server": "",
+    "Credential": "",
+    "Token": ""
+  },
+  "Databases": [
+    {
+      "Source": {
+        "AvailabilityGroupName": "",
+        "ServerInstance": "",
+        "WindowsCluster": "",
+        "InstanceName":"",
+        "Name": ""
       },
-      {
-        "Source": {
-          "AvailabilityGroupName": "",
-          "ServerInstance": "",
-          "Cluster": "Not sure sure if this is required yet.",
-          "Name": "AdventureWorks2016"
-        },
-        "Target": {
-          "ServerInstance": "",
-          "Name": "",
-          "RecoveryPoint": "",
-          "Files": [
-            {
-              "LogicalName": "AdventureWorks2014_Data",
-              "Path": "E:\\Microsoft SQL Server\\MSSQL13.MSSQLSERVER\\MSSQL\\DATA",
-              "FileName": "AdventureWorks_Test_Data.mdf"
-            },
-            {
-              "LogicalName": "AdventureWorks2014_Log",
-              "Path": "E:\\Microsoft SQL Server\\MSSQL13.MSSQLSERVER\\MSSQL\\DATA",
-              "FileName": "AdventureWorks_Test_Log.ldf"
-            }
-          ]
-        }
-      }
-    ]
-  }
+      "Target": {
+        "ServerInstance": "",
+        "WindowsCluster":"",
+        "Name": "",
+        "RecoveryPoint": "",
+        "Files": [
+          {
+            "LogicalName": "",
+            "Path": "",
+            "FileName": ""
+          },
+         {
+            "LogicalName": "",
+            "Path": "",
+            "FileName": ""
+          }
+        ]
+      }   
+    }
+  ]
+}
