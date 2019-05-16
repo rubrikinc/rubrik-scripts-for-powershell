@@ -162,10 +162,10 @@ foreach($row in $CSV){
 
                                 $vAppHref = $vApp.href
                                 $vAppID_substring = $vAppHref.Substring($vAppHref.LastIndexOf("/") + 1)
-                                [xml]$payload = '<?xml version="1.0" encoding="UTF-8"?><vcloud:Metadata xmlns:vcloud = "http://www.vmware.com/vcloud/v1.5" xmlns:xsi = "http://www.w3.org/2001/XMLSchema-instance"><vcloud:MetadataEntry><vcloud:Domain visibility="$($row.MetadataDomain)">SYSTEM</vcloud:Domain><vcloud:Key>rbk-connection</vcloud:Key><vcloud:TypedValue xsi:type ="$($row.MetadataKey)"><vcloud:Value>"$($row.MetadataValue)"</vcloud:Value></vcloud:TypedValue></vcloud:MetadataEntry></vcloud:Metadata>'
+                                [xml]$payload = '<?xml version="1.0" encoding="UTF-8"?><vcloud:Metadata xmlns:vcloud = "http://www.vmware.com/vcloud/v1.5" xmlns:xsi = "http://www.w3.org/2001/XMLSchema-instance"><vcloud:MetadataEntry><vcloud:Domain visibility="$($row.MetadataDomain)">SYSTEM</vcloud:Domain><vcloud:Key>$($row.MetadataKey)</vcloud:Key><vcloud:TypedValue xsi:type ="$($row.MetadataType)"><vcloud:Value>"$($row.MetadataValue)"</vcloud:Value></vcloud:TypedValue></vcloud:MetadataEntry></vcloud:Metadata>'
                                 $restoreMetadata = Post-vCloudRequest -endpoint "vApp/$($vAppID_substring)/metadata" -payload $payload -orgId $ID -contenttype "application/vnd.vmware.vcloud.metadata+xml;version=5.5"
                                 Write-Output $restoreMetadata
-                                
+
                             }
                         }
                 }
