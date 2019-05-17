@@ -81,19 +81,31 @@ AS
 	FROM sys.databases db
 	JOIN sys.master_files mf ON db.database_id = mf.database_id
 	group by db.name
+),
+AvailabilityGroupInfo
+AS
+(
+	SELECT DB_NAME([database_id]) as DBName
+		, map.ag_name
+		, rs.is_primary_replica
+	FROM [master].[sys].[dm_hadr_database_replica_states] rs
+	JOIN [master].[sys].[dm_hadr_name_id_map] map
+	ON rs.group_id = map.ag_id
 )
 
 SELECT
 	@@SERVERNAME AS ServerName
     ,SERVERPROPERTY('ProductVersion') AS SQLVersion
-	,db.name
-	,db.recovery_model_desc
+	,db.name as DBName
+	,db.recovery_model_desc as RecoveryModel
 	,ISNULL(lbi.LogBackupTotalMB,0) AS SevenDayLogBackupMB
 	,ISNULL(fbi.AverageBackupSizeMB,0) AS AverageFullMB
 	,ISNULL(fbi.AverageBackupTime,0) AS AverageFullTimeSec
 	,ISNULL(lbi.AverageLogBackupTime,0) AS AverageLogTimeSec
 	,dbinfo.DBTotalSizeMB
     ,AVG(lbii.BackupInterval) AS AverageLogBackupInterval
+	,ISNULL(agi.ag_name, '') as AvailabilityGroupName
+	,ISNULL(agi.is_primary_replica,'1') PrimaryReplica
 	,ISNULL(ef.ChangeCapture,0) AS ChangeCapture
 	,ISNULL(ef.ColumnStoreIndex,0) AS ColumnStoreIndex
 	,ISNULL(ef.[Compression],0) AS Compression
@@ -107,6 +119,7 @@ LEFT OUTER JOIN LogBackupInfo lbi ON db.name = lbi.database_name
 LEFT OUTER JOIN FullBackupInfo fbi ON db.name = fbi.database_name
 LEFT OUTER JOIN LogBackupInterval lbii ON db.name = lbii.database_name
 LEFT OUTER JOIN EnterpriseFeatures ef ON db.name = ef.DatabaseName
+LEFT OUTER JOIN AvailabilityGroupInfo agi ON db.name = agi.dbname
 WHERE db.database_id != 2
  --   AND lbii.PreviousBackupStartDate <> '1900-01-01 00:00:00.000'
 GROUP BY db.name
@@ -116,6 +129,8 @@ GROUP BY db.name
 	,ISNULL(fbi.AverageBackupSizeMB,0)
 	,ISNULL(fbi.AverageBackupTime,0)
 	,ISNULL(lbi.AverageLogBackupTime,0)
+	,ISNULL(agi.ag_name, '') 
+	,ISNULL(agi.is_primary_replica,'1') 
 	,ISNULL(ef.ChangeCapture,0)
 	,ISNULL(ef.[ColumnStoreIndex],0)
 	,ISNULL(ef.[Compression],0)
@@ -123,7 +138,7 @@ GROUP BY db.name
 	,ISNULL(ef.[InMemoryOLTP],0)
 	,ISNULL(ef.[Partitioning],0)
 	,ISNULL(ef.[TransparentDataEncryption],0)
-ORDER BY name
+ORDER BY db.name
 
 
 --exec sp_helpdb @dbname = 'AdventureWorks2012'
