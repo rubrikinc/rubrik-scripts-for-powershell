@@ -91,6 +91,9 @@ AS
 	FROM [master].[sys].[dm_hadr_database_replica_states] rs
 	JOIN [master].[sys].[dm_hadr_name_id_map] map
 	ON rs.group_id = map.ag_id
+	JOIN [master].[sys].[dm_hadr_availability_replica_cluster_states] cs
+	ON rs.group_id = cs.group_id AND rs.replica_id = cs.replica_id
+	WHERE replica_server_name = @@SERVERNAME
 )
 
 SELECT
