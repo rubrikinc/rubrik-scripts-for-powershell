@@ -33,7 +33,7 @@
 #>
 $Username = "notauser"
 $Password = "notapass"
-$vCDHost = "notacell.rubrik.com"
+$vCDHost = "notavcdcell.rubrik.com"
 $orgId = $null
 
 $Global:vCDURL = "https://$($vCDHost)/api"
@@ -43,41 +43,14 @@ $Global:xvCloudAuthorization
 $Global:WebResp = ""
 $Global:protectedMetadata = New-Object System.Data.DataTable
 
-if (-not ([System.Management.Automation.PSTypeName]'ServerCertificateValidationCallback').Type)
-{
-$certCallback = @"
-    using System;
-    using System.Net;
-    using System.Net.Security;
-    using System.Security.Cryptography.X509Certificates;
-    public class ServerCertificateValidationCallback
-    {
-        public static void Ignore()
-        {
-            if(ServicePointManager.ServerCertificateValidationCallback ==null)
-            {
-                ServicePointManager.ServerCertificateValidationCallback += 
-                    delegate
-                    (
-                        Object obj, 
-                        X509Certificate certificate, 
-                        X509Chain chain, 
-                        SslPolicyErrors errors
-                    )
-                    {
-                        return true;
-                    };
-            }
-        }
-    }
-"@
-    Add-Type $certCallback
- }
-[ServerCertificateValidationCallback]::Ignore()
+[Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
 
 $protectedMetadata.Columns.Add("vCDCell", "System.String") | Out-Null
 $protectedMetadata.Columns.Add("vAppName", "System.String") | Out-Null
 $protectedMetadata.Columns.Add("vAppId", "System.String") | Out-Null
+$protectedMetadata.Columns.Add("vmName", "System.String") | Out-Null
+$protectedMetadata.Columns.Add("vmId", "System.String") | Out-Null
+$protectedMetadata.Columns.Add("Metadata", "System.String") | Out-Null
 $protectedMetadata.Columns.Add("MetadataKey", "System.String") | Out-Null
 $protectedMetadata.Columns.Add("MetadataDomain", "System.String") | Out-Null
 $protectedMetadata.Columns.Add("MetadataType", "System.String") | Out-Null
@@ -90,17 +63,15 @@ Function New-vCloudLogin($Username, $Password){
     $Base64 = [System.Convert]::ToBase64String($Bytes)
     $Global:Authorization = "Basic $base64"
     $headers = @{ Authorization = $Global:Authorization; Accept = $Global:Accept; "Content-Type" = "text/plain"}
-    $Global:WebResp = Invoke-WebRequest -Method Post -Headers $headers -Uri "$($Global:vCDURL)/sessions" #-SkipCertificateCheck
-
+    $Global:WebResp = Invoke-WebRequest -Method Post -Headers $headers -Uri "$($Global:vCDURL)/sessions"
     $Global:xvCloudAuthorization = $Global:WebResp.Headers["x-vcloud-authorization"]
-    Write-Host $Global:WebResp.Headers["x-vcloud-authorization"]
 
 }
 
 Function Get-vCloudRequest($endpoint, $contenttype, $orgId){
     $reqHeaders = @{}
     
-    if($orgId -eq $null){
+    if($null -eq $orgId){
         $reqHeaders['x-vcloud-authorization'] = $Global:xvCloudAuthorization
         $reqHeaders['Accept'] = $Global:Accept
     } else {
@@ -109,23 +80,52 @@ Function Get-vCloudRequest($endpoint, $contenttype, $orgId){
         $reqHeaders['X-VMWARE-VCLOUD-TENANT-CONTEXT'] = $orgId
     }
     
-    if($contenttype -eq $null){
+    if($null -eq $contenttype){
         $reqHeaders['Content-Type'] = "text/plain"
     } else {
         $reqHeaders['Content-Type'] = $contenttype
     }
 
-    foreach($header in $reqHeaders){
-        $header
-    }
-
-    [xml]$Response = Invoke-RestMethod -Method GET -Headers $reqHeaders -Uri "$($Global:vCDURL)/$endpoint" #-SkipCertificateCheck
+    [xml]$Response = Invoke-WebRequest -Method GET -Headers $reqHeaders -Uri "$($Global:vCDURL)/$endpoint"
     Return $Response
 }
 
-$NewAuth = New-vCloudLogin –Username "$($Username)@SYSTEM” –Password $Password
-$Orgs = Get-vCloudRequest -endpoint "org"
+Function Get-VMMetadata($vAppID, $vAppName, $orgID){
 
+    $vAppNoVapp = $vAppID.replace("vapp-","")
+    
+    $VMRecords = Get-vCloudRequest -endpoint "query?type=vm&filter=container==$($vAppNoVapp)" -orgId $orgID
+
+    foreach($VMRecord in $VMRecords.QueryResultRecords.VMRecord){
+
+        $vmHref = $VMRecord.href
+        $VMID = $vmHref.Substring($vmHref.LastIndexOf("/") + 1)
+
+        Write-Output "Grabbing VM Metadata for VM: $($VMRecord.name)"
+        $VMMetadata = Get-vCloudRequest -endpoint "vApp/$($VMID)/metadata" -orgId $ID -contenttype "application/vnd.vmware.vcloud.metadata+xml;version=5.5"
+
+        foreach($VMMeta in $VMMetadata.Metadata.MetadataEntry){
+    
+            $nRow = $protectedMetadata.NewRow()
+            $nRow.vCDCell = $vCDHost
+            $nRow.vAppName = $vAppName
+            $nRow.vAppId = $vAppID
+            $nRow.vmName = $VMRecord.name
+            $nRow.vmId = $VMID
+            $nRow.Metadata = "VM"
+            $nRow.MetadataKey = $VMMeta.Key
+            $nRow.MetadataDomain = $VMMeta.Domain.visibility
+            $nRow.MetadataType = $VMMeta.TypedValue.type
+            $nRow.MetadataValue = $VMMeta.TypedValue.Value
+            $protectedMetadata.Rows.Add($nRow)
+
+        }
+
+    }
+}
+
+New-vCloudLogin –Username "$($Username)@SYSTEM” –Password $Password
+$Orgs = Get-vCloudRequest -endpoint "org"
 
 foreach($Org in $Orgs.OrgList.Org){
     
@@ -141,7 +141,7 @@ foreach($Org in $Orgs.OrgList.Org){
         $vAppHref = $vApp.href
         $vAppID_substring = $vAppHref.Substring($vAppHref.LastIndexOf("/") + 1)
         
-        Write-Output "Grabbing Metadata"
+        Write-Output "Grabbing vApp Metadata"
         $vAppMetadata = Get-vCloudRequest -endpoint "vApp/$($vAppID_substring)/metadata" -orgId $ID -contenttype "application/vnd.vmware.vcloud.metadata+xml;version=5.5"
 
         foreach($vAppMeta in $vAppMetadata.Metadata.MetadataEntry){
@@ -150,6 +150,9 @@ foreach($Org in $Orgs.OrgList.Org){
             $nRow.vCDCell = $vCDHost
             $nRow.vAppName = $vApp.name
             $nRow.vAppId = $vAppID_substring
+            $nRow.vmID = ""
+            $nRow.vmName = ""
+            $nRow.Metadata = "vApp" 
             $nRow.MetadataKey = $vAppMeta.Key
             $nRow.MetadataDomain = $vAppMeta.Domain.visibility
             $nRow.MetadataType = $vAppMeta.TypedValue.type
@@ -158,8 +161,12 @@ foreach($Org in $Orgs.OrgList.Org){
 
         }
 
+        Get-VMMetadata -vAppID $vAppID_substring -vAppName $vApp.name -orgID $ID
+        
     }
+
 }
+Write-Output $protectedMetadata.Rows.Count
 
 Write-Output $protectedMetadata | Format-Table -Force
 $date = Get-Date -format "yyyyMMddHHmmss"
