@@ -122,54 +122,131 @@ $NewAuth = New-vCloudLogin –Username "$($Username)@SYSTEM” –Password $Pass
 
 foreach($row in $CSV){
 
-    $vAppResp = "N"
-    $vAppResp = Read-Host "Would you like to restore Metadata Key: $($row.MetadataKey), Value: $($row.MetadataValue) and Domain: $($row.MetadataDomain)  for vApp $($row.vAppName)? Y/N (Default: N): "
-    
-    if($vAppResp -eq "Y"){
-
-        $Orgs = Get-vCloudRequest -endpoint "org"
-        foreach($Org in $Orgs.OrgList.Org){
-    
-            $orgHref = $Org.href
-            $ID = $orgHref.Substring($orgHref.LastIndexOf("/") + 1)
-
-            $vApps = Get-vCloudRequest -endpoint "vApps/query" -orgId $ID
-            $vappFound = $false
-
-            foreach($vApp in $vApps.QueryResultRecords.VAppRecord){
-
-                $vAppHref = $vApp.href
-                $vAppID_substring = $vAppHref.Substring($vAppHref.LastIndexOf("/") + 1)
+    if($row.Metadata -eq "vApp"){
+        $vAppResp = "N"
+        $vAppResp = Read-Host "Would you like to restore Metadata Key: $($row.MetadataKey), Value: $($row.MetadataValue) and Domain: $($row.MetadataDomain)  for vApp $($row.vAppName)? Y/N (Default: N): "
         
-                if($vAppID_substring -eq $row.vAppId){
-
-                    $vappFound = $true
-                    [xml]$payload = '<?xml version="1.0" encoding="UTF-8"?><vcloud:Metadata xmlns:vcloud = "http://www.vmware.com/vcloud/v1.5" xmlns:xsi = "http://www.w3.org/2001/XMLSchema-instance"><vcloud:MetadataEntry><vcloud:Domain visibility="$($row.MetadataDomain)">SYSTEM</vcloud:Domain><vcloud:Key>$($row.MetadataKey)</vcloud:Key><vcloud:TypedValue xsi:type ="$($row.MetadataType)"><vcloud:Value>"$($row.MetadataValue)"</vcloud:Value></vcloud:TypedValue></vcloud:MetadataEntry></vcloud:Metadata>'
-                    $restoreMetadata = Post-vCloudRequest -endpoint "vApp/$($vAppID_substring)/metadata" -payload $payload -orgId $ID -contenttype "application/vnd.vmware.vcloud.metadata+xml;version=5.5"
-                    Write-Output $restoreMetadata
+        if($vAppResp -eq "Y"){
+    
+            $Orgs = Get-vCloudRequest -endpoint "org"
+            foreach($Org in $Orgs.OrgList.Org){
+        
+                $orgHref = $Org.href
+                $ID = $orgHref.Substring($orgHref.LastIndexOf("/") + 1)
+    
+                $vApps = Get-vCloudRequest -endpoint "vApps/query" -orgId $ID
+                $vappFound = $false
+    
+                foreach($vApp in $vApps.QueryResultRecords.VAppRecord){
+    
+                    $vAppHref = $vApp.href
+                    $vAppID_substring = $vAppHref.Substring($vAppHref.LastIndexOf("/") + 1)
+            
+                    if($vAppID_substring -eq $row.vAppId){
+    
+                        $vappFound = $true
+                        [xml]$payload = '<?xml version="1.0" encoding="UTF-8"?><vcloud:Metadata xmlns:vcloud = "http://www.vmware.com/vcloud/v1.5" xmlns:xsi = "http://www.w3.org/2001/XMLSchema-instance"><vcloud:MetadataEntry><vcloud:Domain visibility="$($row.MetadataDomain)">SYSTEM</vcloud:Domain><vcloud:Key>$($row.MetadataKey)</vcloud:Key><vcloud:TypedValue xsi:type ="$($row.MetadataType)"><vcloud:Value>"$($row.MetadataValue)"</vcloud:Value></vcloud:TypedValue></vcloud:MetadataEntry></vcloud:Metadata>'
+                        $restoreMetadata = Post-vCloudRequest -endpoint "vApp/$($vAppID_substring)/metadata" -payload $payload -orgId $ID -contenttype "application/vnd.vmware.vcloud.metadata+xml;version=5.5"
+                        Write-Output $restoreMetadata
+                    }
                 }
-            }
-
-            if($vappFound -eq $false){
-                $notFound = Read-Host "vApp $($row.vAppName) with ID $($row.vAppId) was not found. Would you like to restore this to another vApp? Y/N"
-                if($notFound -eq "Y"){
-
-                    $vAppNameTarget = Read-Host "Enter the name of the target vApp: "
-
-                        foreach($vApp in $vApps.QueryResultRecords.VAppRecord){
-        
-                            if($vApp.name.ToLower() -eq $vAppNameTarget.ToLower()){
-
-                                $vAppHref = $vApp.href
-                                $vAppID_substring = $vAppHref.Substring($vAppHref.LastIndexOf("/") + 1)
-                                [xml]$payload = '<?xml version="1.0" encoding="UTF-8"?><vcloud:Metadata xmlns:vcloud = "http://www.vmware.com/vcloud/v1.5" xmlns:xsi = "http://www.w3.org/2001/XMLSchema-instance"><vcloud:MetadataEntry><vcloud:Domain visibility="$($row.MetadataDomain)">SYSTEM</vcloud:Domain><vcloud:Key>$($row.MetadataKey)</vcloud:Key><vcloud:TypedValue xsi:type ="$($row.MetadataType)"><vcloud:Value>"$($row.MetadataValue)"</vcloud:Value></vcloud:TypedValue></vcloud:MetadataEntry></vcloud:Metadata>'
-                                $restoreMetadata = Post-vCloudRequest -endpoint "vApp/$($vAppID_substring)/metadata" -payload $payload -orgId $ID -contenttype "application/vnd.vmware.vcloud.metadata+xml;version=5.5"
-                                Write-Output $restoreMetadata
-
+    
+                if($vappFound -eq $false){
+                    $notFound = Read-Host "vApp $($row.vAppName) with ID $($row.vAppId) was not found. Would you like to restore this to another vApp? Y/N"
+                    if($notFound -eq "Y"){
+    
+                        $vAppNameTarget = Read-Host "Enter the name of the target vApp: "
+    
+                            foreach($vApp in $vApps.QueryResultRecords.VAppRecord){
+            
+                                if($vApp.name.ToLower() -eq $vAppNameTarget.ToLower()){
+    
+                                    $vAppHref = $vApp.href
+                                    $vAppID_substring = $vAppHref.Substring($vAppHref.LastIndexOf("/") + 1)
+                                    [xml]$payload = '<?xml version="1.0" encoding="UTF-8"?><vcloud:Metadata xmlns:vcloud = "http://www.vmware.com/vcloud/v1.5" xmlns:xsi = "http://www.w3.org/2001/XMLSchema-instance"><vcloud:MetadataEntry><vcloud:Domain visibility="$($row.MetadataDomain)">SYSTEM</vcloud:Domain><vcloud:Key>$($row.MetadataKey)</vcloud:Key><vcloud:TypedValue xsi:type ="$($row.MetadataType)"><vcloud:Value>"$($row.MetadataValue)"</vcloud:Value></vcloud:TypedValue></vcloud:MetadataEntry></vcloud:Metadata>'
+                                    $restoreMetadata = Post-vCloudRequest -endpoint "vApp/$($vAppID_substring)/metadata" -payload $payload -orgId $ID -contenttype "application/vnd.vmware.vcloud.metadata+xml;version=5.5"
+                                    Write-Output $restoreMetadata
+    
+                                }
                             }
-                        }
+                    }
                 }
             }
         }
-    }
+
+    } elseif($row.Metadata -eq "VM"){
+
+        $VMResp = "N"
+        $VMResp = Read-Host "Would you like to restore Metadata Key: $($row.MetadataKey), Value: $($row.MetadataValue) and Domain: $($row.MetadataDomain)  for VM $($row.vmName)? Y/N (Default: N): "
+        
+        if($vAppResp -eq "Y"){
+    
+            $Orgs = Get-vCloudRequest -endpoint "org"
+            foreach($Org in $Orgs.OrgList.Org){
+        
+                $orgHref = $Org.href
+                $ID = $orgHref.Substring($orgHref.LastIndexOf("/") + 1)
+    
+                $vApps = Get-vCloudRequest -endpoint "vApps/query" -orgId $ID
+                $vappFound = $false
+    
+                foreach($vApp in $vApps.QueryResultRecords.VAppRecord){
+
+                    $vAppNoVapp = $ID.replace("vapp-","")
+                    $vAppHref = $vApp.href
+                    $vAppID_substring = $vAppHref.Substring($vAppHref.LastIndexOf("/") + 1)
+            
+                    if($vAppID_substring -eq $row.vAppId){
+
+                        $VMRecords = Get-vCloudRequest -endpoint "query?type=vm&filter=container==$($vAppNoVapp)" -orgId $orgID
+
+                        foreach($VMRecord in $VMRecords.QueryResultRecords.VMRecord){
+                    
+                            $vmHref = $VMRecord.href
+                            $VMID = $vmHref.Substring($vmHref.LastIndexOf("/") + 1)
+                            
+                            if($VMID -eq $row.vmID){
+                                $VMFound = $true
+                                [xml]$payload = '<?xml version="1.0" encoding="UTF-8"?><vcloud:Metadata xmlns:vcloud = "http://www.vmware.com/vcloud/v1.5" xmlns:xsi = "http://www.w3.org/2001/XMLSchema-instance"><vcloud:MetadataEntry><vcloud:Domain visibility="$($row.MetadataDomain)">SYSTEM</vcloud:Domain><vcloud:Key>$($row.MetadataKey)</vcloud:Key><vcloud:TypedValue xsi:type ="$($row.MetadataType)"><vcloud:Value>"$($row.MetadataValue)"</vcloud:Value></vcloud:TypedValue></vcloud:MetadataEntry></vcloud:Metadata>'
+                                $restoreMetadata = Post-vCloudRequest -endpoint "vApp/$($vAppID_substring)/metadata" -payload $payload -orgId $ID -contenttype "application/vnd.vmware.vcloud.metadata+xml;version=5.5"
+                                Write-Output $restoreMetadata
+                            }
+                        }    
+
+                    }
+                }
+    
+                if($vappFound -eq $false){
+                    $notFound = Read-Host "vApp $($row.vAppName) with ID $($row.vAppId) was not found. Would you like to restore this to another vApp? Y/N"
+                    if($notFound -eq "Y"){
+    
+                        $vAppNameTarget = Read-Host "Enter the name of the target vApp: "
+                        $vmNameTarget = Read-Host "Enter the name of the target VM: "
+    
+                            foreach($vApp in $vApps.QueryResultRecords.VAppRecord){
+            
+                                if($vApp.name.ToLower() -eq $vAppNameTarget.ToLower()){
+    
+                                    $vAppHref = $vApp.href
+                                    $vAppID_substring = $vAppHref.Substring($vAppHref.LastIndexOf("/") + 1)
+
+                                    $VMRecords = Get-vCloudRequest -endpoint "query?type=vm&filter=container==$($vAppNoVapp)" -orgId $orgID
+
+                                    foreach($VMRecord in $VMRecords.QueryResultRecords.VMRecord){
+                                        $vmHref = $VMRecord.href
+                                        $VMID = $vmHref.Substring($vmHref.LastIndexOf("/") + 1)
+
+                                        if($VMRecord.name -eq $vmNameTarget){
+                                            [xml]$payload = '<?xml version="1.0" encoding="UTF-8"?><vcloud:Metadata xmlns:vcloud = "http://www.vmware.com/vcloud/v1.5" xmlns:xsi = "http://www.w3.org/2001/XMLSchema-instance"><vcloud:MetadataEntry><vcloud:Domain visibility="$($row.MetadataDomain)">SYSTEM</vcloud:Domain><vcloud:Key>$($row.MetadataKey)</vcloud:Key><vcloud:TypedValue xsi:type ="$($row.MetadataType)"><vcloud:Value>"$($row.MetadataValue)"</vcloud:Value></vcloud:TypedValue></vcloud:MetadataEntry></vcloud:Metadata>'
+                                            $restoreMetadata = Post-vCloudRequest -endpoint "vApp/$($VMID)/metadata" -payload $payload -orgId $ID -contenttype "application/vnd.vmware.vcloud.metadata+xml;version=5.5"
+                                            Write-Output $restoreMetadata
+                                        }
+                                    }
+                                }
+                            }
+                    }
+                }
+            }
+        }
+    }    
 }
