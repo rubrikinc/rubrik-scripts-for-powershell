@@ -96,4 +96,4 @@ foreach ($snappable in $report_data_obj) {
 }
 write-host "Outputted CSV file to current Directory: $(Get-Location)\rubrik_backup_sla_misssed_snapshots.csv"
 $csv_data | export-csv .\rubrik_backup_sla_misssed_snapshots.csv -notype -Force
-write-host "Script Completed"
+write-host "Script Completed - An Empty CSV indicates no missed snapshots!"
