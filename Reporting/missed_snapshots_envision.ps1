@@ -1,3 +1,32 @@
+<#
+    .SYNOPSIS
+        Checks Missed Snapshots endpoints for all MSSQL, VMs and Filesets
+
+    .DESCRIPTION
+        Loops through all MSSQL, VM and Fileset objects and checks for a missed snapshot
+
+    .PARAMETER JobFile
+        None
+
+    .INPUTS
+        None
+
+    .OUTPUTS
+        CSV File - Output of any missed snapshots
+
+    .EXAMPLE
+        ./missed_snapshots_envision.ps1
+
+    .LINK
+        None
+
+    .NOTES
+        Name:       Missed Snapshot Envision Report
+        Created:    29th May 2019
+        Author:     Andy Draper (Draper1)
+
+#>
+
 Import-Module Rubrik
 # New functions to get only missed snapshots
 function Get-RubrikVmwareMissedSnapshot ($vm_id) {
@@ -20,7 +49,8 @@ function Get-RubrikSqlDbMissedSnapshot ($sqldb_id) {
 }
 
 # Variables
-$rubrik_ip = 'notacluster.rubrik.com'
+$rubrik_ip = Read-Host 'Please enter the Rubrik IP or DNS Address'
+Write-Output "Logging into Rubrik..."
 $rubrik_cred = Get-Credential
 Connect-Rubrik -Server $rubrik_ip -Credential $rubrik_cred
 # Declare Arrays for use
