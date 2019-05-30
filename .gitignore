@@ -1,3 +1,6 @@
 /con*
 .creds
 Export-RubrikDatabasesJobFile - DN Test.json
+
+# Ignore VSCode
+.vscode/
