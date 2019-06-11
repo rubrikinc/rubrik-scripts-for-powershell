@@ -6,7 +6,7 @@ $data = Get-Content $csvfile
 
 if ($data[0].Substring(1,10) -ne "ServerName")
 {
-    $Header ="ServerName","SQLVersion","name","recovery_model_desc","SevenDayLogBackupMB","AverageFullMB","AverageFullTimeSec","AverageLogTimeSec","DBTotalSizeMB","AverageLogBackupInterval","ChangeCapture","Compression","FILESTREAM","InMemoryOLTP","Partitioning","TransparentDataEncryption"
+    $Header ="ServerName","SQLVersion","name","recovery_model_desc","SevenDayLogBackupMB","AverageFullMB","AverageFullTimeSec","AverageLogTimeSec","DBTotalSizeMB","AverageLogBackupInterval","ChangeCapture","ColumnStoreIndex","Compression","FILESTREAM","InMemoryOLTP","Partitioning","TransparentDataEncryption"
     $rawdata = Get-Content $csvfile | ConvertFrom-Csv -Delimiter $delimiter -Header $Header
 }
 else 
