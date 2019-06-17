@@ -3,26 +3,31 @@
     Start-RubrikDBMigration.ps1 migrates databases from one server to another via Rubrik
 .DESCRIPTION
     Start-RubrikDBMigration.ps1 migrates databases from one server to another via Rubrik. Script is meant for 
-    small environments. For larger environments consider using log shipping
+    small environments. For larger environments consider using log shipping.
+    The script will take an on demand backup of each database provided and then wait for them to complete. Once they do, they will then start to restore to the target SQL Server. 
 .PARAMETER RubrikCluster
-    The IP address or name to your Rubrik Cluster
+    The IP address or name to your Rubrik Cluster. Required to be provided at runtime via the cmdline
 .PARAMETER SourceSQLHost
     The host name to the source SQL Server
-.PARAMETER SourceInstance
-    The instance for the SQL Server. Parameter is optional if usinga default instance. 
+.PARAMETER SourceSQLInstance
+    The instance for the SQL Server. Parameter is optional if using a default instance. If no value is provided, then we will assume MSSQLSERVER
 .PARAMETER Databases
     Provide a single database or a comma separated list of databases. 
 .PARAMETER TargetSQLHost
     The host name to the target SQL Server
-.PARAMETER TargetInstance
-    The instance for the SQL Server. Parameter is optional if usinga default instance. 
+.PARAMETER TargetSQLInstance
+    The instance for the SQL Server. Parameter is optional if using a default instance. If no value is provided, then we will assume MSSQLSERVER
 .PARAMETER TargetDataPath
-    Path on the target SQL Server where SQL Server data files should live
+    Path on the target SQL Server where SQL Server data files should live. If no value is provided, we will get the value from the target SQL Server.
 .PARAMETER TargetLogPath
-    Path on the target SQL Server where SQL Server log files should live
+    Path on the target SQL Server where SQL Server log files should live. If no value is provided, we will get the value from the target SQL Server.
+.PARAMETER MigrationFile
+    Path to a CSV file with databases that should be migrated. 
+
+    The CSV file should have the Column Header of the below
+    SourceSQLHost, SourceSQLInstance, DatabaseName, TargetSQLHost, TargetSQLInstance, TargetDataPath, TargetLogPath
 .PARAMETER TurnOffOldDBs
-    If used, databases on Source SQL Server Instance will be set to read only and then set to offline
-    after the backup has been taken. 
+    If used, databases on Source SQL Server Instance will be set to read only and then set to offline after the backup has been taken. 
 .EXAMPLE
     PS C:\> .\Start-RubrikDBMigration.ps1 `
         -RubrikCluster 172.21.54.18 `
@@ -48,189 +53,352 @@
     Author:     Chris Lumnah
     Created:    10/20/2018
     Company:    Rubrik Inc
-    https://github.com/rubrik-devops/powershell-scripts
+    https://github.com/rubrikinc/rubrik-scripts-for-powershell
+    Updated:    06/14/2016
+    Updater:    Chris Lumnah
+    Updates:    Script will take either a csv of values or continue to take values from the cmdline. 
+                Script will take a SQL Server and Instance as DBA would understand them and go look up the Windows Cluster name. 
+                Script now requires the FailoverClusters module from Microsoft. 
+                Script will work with stand alone SQL Instances and SQL Failover CLustered Instances
 #>
+[cmdletbinding(DefaultParameterSetName='File')]
 param(
     [Parameter(Mandatory=$true)]
-    [String]$RubrikCluster,
+    [String]$RubrikServer,
 
-    [Parameter(Mandatory=$true)]
+    [Parameter(ParameterSetName="CMDLINE")]
     [String]$SourceSQLHost,
     
-    [Parameter(Mandatory=$false)]
-    [String]$SourceInstance = 'MSSQLSERVER',
+    [Parameter(ParameterSetName="CMDLINE")]
+    [String]$SourceSQLInstance = 'MSSQLSERVER',
 
-    [Parameter(Mandatory=$true)]
+    [Parameter(ParameterSetName="CMDLINE")]
     [String[]]$Databases,
 
-    [Parameter(Mandatory=$true)]
+    [Parameter(ParameterSetName="CMDLINE")]
     [String]$TargetSQLHost,
 
-    [Parameter(Mandatory=$false)]
-    [String]$TargetInstance = 'MSSQLSERVER',
+    [Parameter(ParameterSetName="CMDLINE")]
+    [String]$TargetSQLInstance = 'MSSQLSERVER',
     
-    [Parameter(Mandatory=$true)]
+    [Parameter(ParameterSetName="CMDLINE")]
     [String]$TargetDataPath,
     
-    [Parameter(Mandatory=$true)]
+    [Parameter(ParameterSetName="CMDLINE")]
     [String]$TargetLogPath,
-    
+
+    [Parameter(ParameterSetName="File")]
+    [string]$MigrationFile,
+
+    [Parameter(Mandatory=$false)]
     [switch]$TurnOffOldDBs
 )
+#region FUNCTIONS
+function Get-SQLDatabaseDefaultLocations{
+    #Code is based on snippet provied by Steve Bonham of LFG
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Server
+    )
+    Import-Module sqlserver  
+    $SMOServer = new-object ('Microsoft.SqlServer.Management.Smo.Server') $Server 
 
+    # Get the Default File Locations 
+    $DatabaseDefaultLocations = New-Object PSObject
+    Add-Member -InputObject $DatabaseDefaultLocations -MemberType NoteProperty -Name Data -Value $SMOServer.Settings.DefaultFile 
+    Add-Member -InputObject $DatabaseDefaultLocations -MemberType NoteProperty -Name Log -Value $SMOServer.Settings.DefaultLog 
+  
+    if ($DatabaseDefaultLocations.Data.Length -eq 0){$DatabaseDefaultLocations.Data = $SMOServer.Information.MasterDBPath} 
+    if ($DatabaseDefaultLocations.Log.Length -eq 0){$DatabaseDefaultLocations.Log = $SMOServer.Information.MasterDBLogPath} 
+    return $DatabaseDefaultLocations
+}
+
+function Get-WindowsClusterResource{
+    param(
+        [String]$ServerInstance,
+        [String]$Instance
+    )
+    Import-Module FailoverClusters
+    Import-Module SqlServer
+    $InvokeSQLCMD = @{
+        Query = "SELECT TOP (1) [NodeName] FROM [master].[sys].[dm_os_cluster_nodes]"
+        ServerInstance = $ServerInstance
+    }
+    $Results = Invoke-SQLCMD @InvokeSQLCMD      
+    if ([bool]($Results.PSobject.Properties.name -match "NodeName") -eq $true){  
+        $Cluster = Get-ClusterResource -Cluster $Results.NodeName | Where-Object {$_.ResourceType -like "*SQL Server*" -and $_.Name -like "*$Instance*" -and $_.Name -notlike "*Agent*"} 
+        return $Cluster
+    }
+}
+#endregion
+#region MODULES
+#Requires -Modules FailoverClusters, Rubrik, SQLServer
 Import-Module Rubrik
 Import-Module SQLServer
-
-$Credential = (Get-Credential -Message "Enter User ID and Password to connect to Rurbik Cluster" )
-Connect-Rubrik -Server $RubrikCluster -Credential $Credential
-
-$SourceServerInstance = $SourceSQLHost
-if ($SourceInstance.ToUpper() -ne 'MSSQLSERVER')
-{
-    $SourceServerInstance = "$($SourceSQLHost)\$($SourceInstance)"
+Import-Module FailoverClusters
+#endregion
+#region Rubrik Connection Information
+#$Credential = (Get-Credential -Message "Enter User ID and Password to connect to Rubrik Cluster" )
+$ConnectRubrik = @{
+    Server = $RubrikServer
+    Credential = $Credential
+    #Credential  = $Credentials.RangerLab
 }
+Connect-Rubrik @ConnectRubrik
+#endregion
 
-#Create an object to store databases to be backed up
-[System.Collections.ArrayList] $DatabasesToBeMigrated=@()
-foreach ($Database in $Databases)
-{
-    $db = New-Object PSObject
-    $db | Add-Member -type NoteProperty -name HostName -Value $SourceSQLHost
-    $db | Add-Member -type NoteProperty -name Instance -Value $SourceInstance
-    $db | Add-Member -type NoteProperty -name Name -Value $Database
-    $db | Add-Member -type NoteProperty -name SourceServerInstance -Value $SourceServerInstance
-    $db | Add-Member -type NoteProperty -name ID -Value ""
-    $db | Add-Member -type NoteProperty -name RubrikRequestID -Value ""
-    $db | Add-Member -type NoteProperty -name RubrikRequestStatus -Value ""
-    $db | Add-Member -type NoteProperty -name RubrikRequestProgress -Value ""
-    $db | Add-Member -type NoteProperty -name RubrikSLADomain -Value ""
-    $db | Add-Member -type NoteProperty -name isLiveMount -Value ""
-    $DatabasesToBeMigrated += $db
-}
+#region Create a queue of all databases that need to be migrated
+$DatabasesToBeMigrated = if ($PSBoundParameters.ContainsKey('MigrationFile')){
+    $MigrationTasks = Import-Csv $MigrationFile 
 
-#Backup each database via an async job on Rubrik appliance
-Foreach($Database in $DatabasesToBeMigrated)
-{
-    if($TurnOffOldDBs)
-    {
-        Write-Host "Setting $($Database.Name) to Read Only"
-        $Query = "ALTER DATABASE [$($Database.Name)] SET READ_ONLY WITH NO_WAIT"
-        Invoke-Sqlcmd -ServerInstance $Database.SourceServerInstance -Query $Query
+    foreach ($Database in $MigrationTasks){
+        $db = [ordered]@{}
+        $db.SourceSQLHost = $Database.SourceSQLHost
+        
+        if ([string]::IsNullOrEmpty($Database.SourceSQLInstance)){
+            $db.SourceSQLInstance = "MSSQLSERVER"
+            $db.SourceServerInstance = "$($Database.SourceSQLHost)"
+        }else{
+            $db.SourceSQLInstance = $Database.SourceSQLInstance
+            $db.SourceServerInstance = "$($Database.SourceSQLHost)\$($Database.SourceSQLInstance)"
+        }
+        
+        $db.Name = $Database.DatabaseName
+
+        $db.TargetSQLHost = $Database.TargetSQLHost
+        if ([string]::IsNullOrEmpty($Database.TargetSQLInstance)){
+            $db.TargetSQLInstance = "MSSQLSERVER"
+            $db.TargetServerInstance = "$($Database.TargetSQLHost)"
+        }else{
+            $db.TargetSQLInstance = $Database.TargetSQLInstance
+            $db.TargetServerInstance = "$($Database.TargetSQLHost)\$($Database.TargetSQLInstance)"
+        }
+
+        $db.TargetRubrikInstance = ""
+        $db.TargetDataPath = $Database.TargetDataPath
+        $db.TargetLogPath = $Database.TargetLogPath
+        $db.RubrikDatabase = ""
+        $db.RubrikRequest = ""
+        [pscustomobject]$db
     }
+}else{
+    foreach ($Database in $Databases){
+        $db = [ordered]@{}
+        $db.SourceSQLHost = $SourceSQLHost
+        
+        if ([string]::IsNullOrEmpty($SourceSQLInstance)){
+            $db.SourceSQLInstance = "MSSQLSERVER"
+            $db.SourceServerInstance = "$($SourceSQLHost)"
+        }else{
+            $db.SourceSQLInstance = $SourceSQLInstance
+            $db.SourceServerInstance = "$($SourceSQLHost)\$($SourceSQLInstance)"
+        }
 
-    $RubrikDatabase = Get-RubrikDatabase -Name $Database.Name -Hostname $Database.HostName -Instance $Database.Instance.ToUpper()
-    $Database.id = $RubrikDatabase.ID
-    Write-Host "Kicking off a on demand backup of $($Database.Name)"
-    $RubrikRequest = New-RubrikSnapshot -id $RubrikDatabase.id -SLA $RubrikDatabase.effectiveSlaDomainName -Confirm:$false
-    $Database.RubrikRequestID = $RubrikRequest.id
+        $db.Name = $Database
 
+        $db.TargetSQLHost = $TargetSQLHost
+
+        if ([string]::IsNullOrEmpty($TargetSQLInstance)){
+            $db.TargetSQLInstance = "MSSQLSERVER"
+            $db.TargetServerInstance = "$($TargetSQLHost)"
+        }else{
+            $db.TargetSQLInstance = $TargetSQLInstance
+            $db.TargetServerInstance = "$($TargetSQLHost)\$($TargetSQLInstance)"
+        }
+
+        $db.TargetRubrikInstance = ""
+        $db.TargetDataPath = $TargetDataPath
+        $db.TargetLogPath = $TargetLogPath
+        $db.RubrikDatabase = ""
+        $db.RubrikRequest = ""
+        [pscustomobject]$db
+    }
+}
+#endregion
+
+#region Set databases to read only if this is the final backup
+if($TurnOffOldDBs){
+    Foreach($Database in $DatabasesToBeMigrated){
+        Write-Host "Setting $($Database.Name) on $($Database.SourceServerInstance) to Read Only"
+        
+        $InvokeSQLCMD = @{
+            ServerInstance = $Database.SourceServerInstance
+            Query = "ALTER DATABASE [$($Database.Name)] SET READ_ONLY WITH NO_WAIT"
+        }
+        Invoke-Sqlcmd @InvokeSQLCMD
+    }
+}
+#endregion
+
+#Backup each database via an async job on Rubrik cluster
+Foreach($Database in $DatabasesToBeMigrated){
+    #Check if Source SQL Server is a FCI
+    $GetWindowsCluster = @{
+        ServerInstance = $Database.SourceServerInstance
+        Instance = $Database.SourceSQLInstance
+    }
+    $Cluster =  Get-WindowsClusterResource @GetWindowsCluster
+    if ([bool]($Cluster.PSobject.Properties.name -match "Cluster") -eq $true){
+        $GetRubrikDatabase = @{
+            Name = $Database.Name
+            HostName = $Cluster.Cluster
+            Instance = $Database.SourceSQLInstance
+        }
+    }else{
+        $GetRubrikDatabase = @{
+            Name = $Database.Name
+            HostName = $Database.SourceSQLHost
+            Instance = $Database.SourceSQLInstance
+        }
+    }
+    $Database.RubrikDatabase = Get-RubrikDatabase @GetRubrikDatabase
+
+    if ([bool]($Database.RubrikDatabase.PSobject.Properties.name -match "id") -eq $true){
+        Write-Host "Kicking off an on demand backup of $($Database.Name) on $($Database.SourceServerInstance)"
+        $NewRubrikSnapshot = @{
+            id = $Database.RubrikDatabase.id
+            SLA = $Database.RubrikDatabase.effectiveSlaDomainName
+            Confirm = $false
+        }
+        $Database.RubrikRequest = New-RubrikSnapshot @NewRubrikSnapshot
+    }
+}
+#Get the Target info for the queue
+Foreach($Database in $DatabasesToBeMigrated){
+    $GetWindowsCluster = @{
+        ServerInstance = $Database.TargetServerInstance
+        Instance = $Database.TargetSQLInstance
+    }
+    $Cluster =  Get-WindowsClusterResource @GetWindowsCluster
+
+    if ([bool]($Cluster.PSobject.Properties.name -match "Cluster") -eq $true){
+        $GetRubrikSQLInstance = @{
+            HostName = $Cluster.Cluster
+            Name = $Database.TargetSQLInstance
+        }
+        #Use this later to refresh the host that we restore too
+        $GetRubrikHost = @{
+            Name = $Cluster.OwnerNode
+        }
+    }else{
+        $GetRubrikSQLInstance = @{
+            HostName = $Database.TargetSQLHost
+            Name = $Database.TargetSQLInstance
+        }
+        #Use this later to refresh the host that we restore too
+        $GetRubrikHost = @{
+            Name = $Database.TargetSQLHost
+        }
+    }
+    $Database.TargetRubrikInstance = Get-RubrikSQLInstance @GetRubrikSQLInstance
 }
 
 #Wait for all backups to complete
-do
-{
-    foreach ($Database in $DatabasesToBeMigrated | where-object {-not ([string]::IsNullOrEmpty($_.RubrikRequestID)) -and $_.RubrikRequestStatus -notin 'FAILED','SUCCEEDED' })
-    {
-        $Request = Get-RubrikRequest -id $Database.RubrikRequestId -Type 'mssql'
-        $Database.RubrikRequestStatus = $Request.Status
-        if ($Request.Status -eq 'RUNNING'){$Database.RubrikRequestProgress = $Request.Progress}
+do{
+    foreach ($Database in $DatabasesToBeMigrated | where-object {-not ([string]::IsNullOrEmpty($_.RubrikRequest.ID)) -and $_.RubrikRequest.Status -notin 'FAILED','SUCCEEDED' }){
+        $Request = Get-RubrikRequest -id $Database.RubrikRequest.Id -Type 'mssql'
+        $Database.RubrikRequest.Status = $Request.Status
+        if ($Request.Status -eq 'RUNNING'){$Database.RubrikRequest.Progress = $Request.Progress}
         Write-Host "Checking $($Database.Name) backup progress. $($Request.Progress) complete. Current Status is $($Request.Status)"
     }
-    $x=$DatabasesToBeMigrated | where-object {-not ([string]::IsNullOrEmpty($_.RubrikRequestID)) -and $_.RubrikRequestStatus -notin 'FAILED','SUCCEEDED' } | Measure-Object
+    $x=$DatabasesToBeMigrated | where-object {-not ([string]::IsNullOrEmpty($_.RubrikRequest.ID)) -and $_.RubrikRequest.Status -notin 'FAILED','SUCCEEDED' } | Measure-Object
 }until ($x.count -eq 0)
-
-#Lets Start doing Restores 
-$TargetRubrikInstance = Get-RubrikSQLInstance -Hostname $TargetSQLHost -Name $TargetInstance.ToUpper()
-$TargetServerInstance = $TargetSQLHost
-if ($TargetInstance -ne "MSSQLSERVER")
-{
-    $TargetServerInstance = "$($TargetSQLHost)\$($TargetInstance)"
-}
-
 #Clean up the target server and get rid of the database if it already exists. 
+#Lets Start doing Restores 
 Foreach($Database in $DatabasesToBeMigrated)
 {
-    $Database.RubrikRequestID = ""
-    $Database.RubrikRequestStatus = ""
-    $Database.RubrikRequestProgress = ""
+    $Database.RubrikRequest = ""
 
     if($TurnOffOldDBs)
     {
         Write-Host "Setting $($Database.Name) offline on $($Database.SourceServerInstance)"
-        $Query = "ALTER DATABASE [$($Database.Name)] SET OFFLINE"
-        Invoke-Sqlcmd -ServerInstance $Database.SourceServerInstance -Query $Query
+        $InvokeSQLCMD = @{
+            ServerInstance = $Database.SourceServerInstance
+            Query = "ALTER DATABASE [$($Database.Name)] SET OFFLINE"
+        }
+        Invoke-Sqlcmd @InvokeSQLCMD
     }
 
-    $Query = "SELECT state_desc FROM sys.databases WHERE name = '" + $Database.Name + "'" 
-    $Results = Invoke-Sqlcmd -ServerInstance $TargetServerInstance -Query $Query
+    $InvokeSQLCMD = @{
+        ServerInstance = $Database.TargetServerInstance
+        Query = "SELECT state_desc FROM sys.databases WHERE name = '" + $Database.Name + "'" 
+    }
+    $Results = Invoke-Sqlcmd @InvokeSQLCMD
 
     if ([bool]($Results.PSobject.Properties.name -match "state_desc") -eq $true)
     {
-        IF ($Results.state_desc -eq 'ONLINE')
+        if ($Results.state_desc -eq 'ONLINE')
         {
             Write-Host "Setting $($Database.Name) to SINGLE_USER"
             Write-Host "Dropping $($Database.Name)"
-            $Query = "ALTER DATABASE [" + $Database.Name + "] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; `nDROP DATABASE [" + $Database.Name + "]"
-            $Results = Invoke-Sqlcmd -ServerInstance $TargetServerInstance -Query $Query
+            $InvokeSQLCMD = @{
+                ServerInstance = $Database.TargetServerInstance
+                Query = "ALTER DATABASE [" + $Database.Name + "] SET SINGLE_USER WITH ROLLBACK IMMEDIATE; `nDROP DATABASE [" + $Database.Name + "]"
+            }
+            $Results = Invoke-Sqlcmd @InvokeSQLCMD
         }
         else 
         {
             Write-Host "Dropping $($Database.Name)"
-                $Query = "DROP DATABASE [" + $Database.Name + "]"
-                $Results = Invoke-Sqlcmd -ServerInstance $TargetServerInstance -Query $Query -Database master
+            $InvokeSQLCMD = @{
+                ServerInstance = $Database.TargetServerInstance
+                Query = "DROP DATABASE [" + $Database.Name + "]"
+            }
+            $Results = Invoke-Sqlcmd @InvokeSQLCMD
         }
     }
     
-    #Refresh Rubik so it does not think the database still exists
-    Write-Host "Refreshing $($TargetSQLHost) in Rubrik"
-    New-RubrikHost -Name $TargetSQLHost -Confirm:$false | Out-Null
+    #Refresh Rubrik so it does not think the database still exists
+    Write-Host "Refreshing $($Database.TargetSQLHost) in Rubrik"
+    Get-RubrikHost @GetRubrikHost | Update-RubrikHost | Out-Null
     
-    $RubrikDatabaseFiles = Get-RubrikDatabaseFiles -Id $Database.ID -RecoveryDateTime (Get-RubrikDatabase -id $Database.ID).latestRecoveryPoint
+    $RubrikDatabaseFiles = Get-RubrikDatabaseFiles -Id $Database.RubrikDatabase.ID -RecoveryDateTime (Get-RubrikDatabase -id $Database.RubrikDatabase.ID).latestRecoveryPoint
+
+    if ([string]::IsNullOrEmpty($Database.TargetDataPath) -or [string]::IsNullOrEmpty($Database.TargetLogPath)){
+        $DatabaseDefaultLocations = Get-SQLDatabaseDefaultLocations -Server $Database.TargetServerInstance
+        $Database.TargetDataPath = $DatabaseDefaultLocations.Data
+        $Database.TargetLogPath = $DatabaseDefaultLocations.Log
+    }
 
     $TargetFiles = @()
-    foreach ($RubrikDatabaseFile in $RubrikDatabaseFiles)
-    {
-        if ($RubrikDatabaseFile.islog -eq $true)
-        {
-            $TargetFiles += @{logicalName=$RubrikDatabaseFile.logicalName;exportPath=$TargetLogPath;newFilename=$RubrikDatabaseFile.originalName}       
-        }
-        else 
-        {
-            $TargetFiles += @{logicalName=$RubrikDatabaseFile.logicalName;exportPath=$TargetDataPath;newFilename=$RubrikDatabaseFile.originalName}       
+    foreach ($RubrikDatabaseFile in $RubrikDatabaseFiles){
+        if ($RubrikDatabaseFile.islog -eq $true){
+            $TargetFiles += @{logicalName=$RubrikDatabaseFile.logicalName;exportPath=$Database.TargetLogPath;newFilename=$RubrikDatabaseFile.originalName}       
+        }else{
+            $TargetFiles += @{logicalName=$RubrikDatabaseFile.logicalName;exportPath=$Database.TargetDataPath;newFilename=$RubrikDatabaseFile.originalName}       
         }
     }
-    Write-Host "Starting restore of $($Database.Name) onto $($TargetServerInstance)"
-    $RubrikRequest = Export-RubrikDatabase -Id $Database.id `
-        -TargetInstanceId $TargetRubrikInstance.id `
-        -TargetDatabaseName $Database.Name `
-        -recoveryDateTime (Get-RubrikDatabase -id $Database.ID).latestRecoveryPoint `
-        -FinishRecovery `
-        -TargetFilePaths $TargetFiles `
-        -Confirm:$false
 
-    $Database.RubrikRequestID = $RubrikRequest.id
-
+    Write-Host "Starting restore of $($Database.Name) onto $($Database.TargetServerInstance)"
+    $ExportRubrikDatabase = @{
+        Id =  $Database.RubrikDatabase.id
+        TargetInstanceId = $Database.TargetRubrikInstance.id 
+        TargetDatabaseName =  $Database.Name 
+        recoveryDateTime = (Get-RubrikDatabase -id $Database.RubrikDatabase.id).latestRecoveryPoint
+        FinishRecovery = $true
+        TargetFilePaths =  $TargetFiles
+        Confirm = $false
+    }
+    $Database.RubrikRequest = Export-RubrikDatabase @ExportRubrikDatabase
 }
-
 #Wait for all restores to complete
-do
-{
-    foreach ($Database in $DatabasesToBeMigrated | where-object {-not ([string]::IsNullOrEmpty($_.RubrikRequestID)) -and $_.RubrikRequestStatus -notin 'FAILED','SUCCEEDED' })
-    {
-        $Request = Get-RubrikRequest -id $Database.RubrikRequestId -Type 'mssql'
-        $Database.RubrikRequestStatus = $Request.Status
-        if ($Request.Status -eq 'RUNNING'){$Database.RubrikRequestProgress = $Request.Progress}
-        Write-Host "Checking $($Database.Name) restore progress. $($Request.Progress) complete"
+do{
+    foreach ($Database in $DatabasesToBeMigrated | where-object {-not ([string]::IsNullOrEmpty($_.RubrikRequest.ID)) -and $_.RubrikRequest.Status -notin 'FAILED','SUCCEEDED' }){
+        $Request = Get-RubrikRequest -id $Database.RubrikRequest.Id -Type 'mssql'
+        $Database.RubrikRequest.Status = $Request.Status
+        if ($Request.Status -eq 'RUNNING'){$Database.RubrikRequest.Progress = $Request.Progress}
+        Write-Host "Checking $($Database.Name) restore progress. $($Request.Progress) complete. Current Status is $($Request.Status)"
     }
-    $x=$DatabasesToBeMigrated | where-object {-not ([string]::IsNullOrEmpty($_.RubrikRequestID)) -and $_.RubrikRequestStatus -notin 'FAILED','SUCCEEDED' } | Measure-Object
+    $x=$DatabasesToBeMigrated | where-object {-not ([string]::IsNullOrEmpty($_.RubrikRequest.ID)) -and $_.RubrikRequest.Status -notin 'FAILED','SUCCEEDED' } | Measure-Object
 }until ($x.count -eq 0)
 
-if($TurnOffOldDBs)
-{
-    Foreach($Database in $DatabasesToBeMigrated)
-    {
+if($TurnOffOldDBs){
+    Foreach($Database in $DatabasesToBeMigrated){
         Write-Host "Setting $($Database.Name) to Read Write"
-        $Query = "ALTER DATABASE [$($Database.Name)] SET READ_WRITE"
-        Invoke-Sqlcmd -ServerInstance $TargetServerInstance -Query $Query
+        $InvokeSQLCMD = @{
+            Query = "ALTER DATABASE [$($Database.Name)] SET READ_WRITE"
+            ServerInstance = $Database.TargetServerInstance
+        }
+        Invoke-Sqlcmd @InvokeSQLCMD
     }
 }
