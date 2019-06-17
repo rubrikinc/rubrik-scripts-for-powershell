@@ -147,74 +147,71 @@ $ConnectRubrik = @{
 Connect-Rubrik @ConnectRubrik
 #endregion
 
-#Create an object to store databases to be backed up
-[System.Collections.ArrayList] $DatabasesToBeMigrated=@()
-
 #region Create a queue of all databases that need to be migrated
-if ($PSBoundParameters.ContainsKey('MigrationFile')){
+$DatabasesToBeMigrated = if ($PSBoundParameters.ContainsKey('MigrationFile')){
     $MigrationTasks = Import-Csv $MigrationFile 
 
     foreach ($Database in $MigrationTasks){
-        $db = New-Object PSObject
-        $db | Add-Member -type NoteProperty -name SourceSQLHost -Value $Database.SourceSQLHost
+        $db = [ordered]@{}
+        $db.SourceSQLHost = $Database.SourceSQLHost
         
         if ([string]::IsNullOrEmpty($Database.SourceSQLInstance)){
-            $db | Add-Member -type NoteProperty -name SourceSQLInstance -Value "MSSQLSERVER"
-            $db | Add-Member -type NoteProperty -name SourceServerInstance -Value "$($Database.SourceSQLHost)"
+            $db.SourceSQLInstance = "MSSQLSERVER"
+            $db.SourceServerInstance = "$($Database.SourceSQLHost)"
         }else{
-            $db | Add-Member -type NoteProperty -name SourceSQLInstance -Value $Database.SourceSQLInstance
-            $db | Add-Member -type NoteProperty -name SourceServerInstance -Value "$($Database.SourceSQLHost)\$($Database.SourceSQLInstance)"
+            $db.SourceSQLInstance = $Database.SourceSQLInstance
+            $db.SourceServerInstance = "$($Database.SourceSQLHost)\$($Database.SourceSQLInstance)"
         }
         
-        $db | Add-Member -type NoteProperty -name Name -Value $Database.DatabaseName
+        $db.Name = $Database.DatabaseName
 
-        $db | Add-Member -type NoteProperty -name TargetSQLHost -Value $Database.TargetSQLHost
+        $db.TargetSQLHost = $Database.TargetSQLHost
         if ([string]::IsNullOrEmpty($Database.TargetSQLInstance)){
-            $db | Add-Member -type NoteProperty -name TargetSQLInstance -Value "MSSQLSERVER"
-            $db | Add-Member -type NoteProperty -name TargetServerInstance -Value "$($Database.TargetSQLHost)"
+            $db.TargetSQLInstance = "MSSQLSERVER"
+            $db.TargetServerInstance = "$($Database.TargetSQLHost)"
         }else{
-            $db | Add-Member -type NoteProperty -name TargetSQLInstance -Value $Database.TargetSQLInstance
-            $db | Add-Member -type NoteProperty -name TargetServerInstance -Value "$($Database.TargetSQLHost)\$($Database.TargetSQLInstance)"
+            $db.TargetSQLInstance = $Database.TargetSQLInstance
+            $db.TargetServerInstance = "$($Database.TargetSQLHost)\$($Database.TargetSQLInstance)"
         }
 
-        $db | Add-Member -type NoteProperty -name TargetRubrikInstance -Value ""
-        $db | Add-Member -type NoteProperty -name TargetDataPath -Value $Database.TargetDataPath
-        $db | Add-Member -type NoteProperty -name TargetLogPath -Value $Database.TargetLogPath
-        $db | Add-Member -type NoteProperty -name RubrikDatabase -Value ""
-        $db | Add-Member -type NoteProperty -name RubrikRequest -Value ""
-        $DatabasesToBeMigrated += $db
+        $db.TargetRubrikInstance = ""
+        $db.TargetDataPath = $Database.TargetDataPath
+        $db.TargetLogPath = $Database.TargetLogPath
+        $db.RubrikDatabase = ""
+        $db.RubrikRequest = ""
+        [pscustomobject]$db
     }
 }else{
     foreach ($Database in $Databases){
-        $db = New-Object PSObject
-        $db | Add-Member -type NoteProperty -name SourceSQLHost -Value $SourceSQLHost
+        $db = [ordered]@{}
+        $db.SourceSQLHost = $SourceSQLHost
         
         if ([string]::IsNullOrEmpty($SourceSQLInstance)){
-            $db | Add-Member -type NoteProperty -name SourceSQLInstance -Value "MSSQLSERVER"
-            $db | Add-Member -type NoteProperty -name SourceServerInstance -Value "$($SourceSQLHost)"
+            $db.SourceSQLInstance = "MSSQLSERVER"
+            $db.SourceServerInstance = "$($SourceSQLHost)"
         }else{
-            $db | Add-Member -type NoteProperty -name SourceSQLInstance -Value $SourceSQLInstance
-            $db | Add-Member -type NoteProperty -name SourceServerInstance -Value "$($SourceSQLHost)\$($SourceSQLInstance)"
+            $db.SourceSQLInstance = $SourceSQLInstance
+            $db.SourceServerInstance = "$($SourceSQLHost)\$($SourceSQLInstance)"
         }
 
-        $db | Add-Member -type NoteProperty -name Name -Value $Database
+        $db.Name = $Database
 
-        $db | Add-Member -type NoteProperty -name TargetSQLHost -Value $TargetSQLHost
+        $db.TargetSQLHost = $TargetSQLHost
 
         if ([string]::IsNullOrEmpty($TargetSQLInstance)){
-            $db | Add-Member -type NoteProperty -name TargetSQLInstance -Value "MSSQLSERVER"
-            $db | Add-Member -type NoteProperty -name TargetServerInstance -Value "$($TargetSQLHost)"
+            $db.TargetSQLInstance = "MSSQLSERVER"
+            $db.TargetServerInstance = "$($TargetSQLHost)"
         }else{
-            $db | Add-Member -type NoteProperty -name TargetSQLInstance -Value $TargetSQLInstance
-            $db | Add-Member -type NoteProperty -name TargetServerInstance -Value "$($TargetSQLHost)\$($TargetSQLInstance)"
+            $db.TargetSQLInstance = $TargetSQLInstance
+            $db.TargetServerInstance = "$($TargetSQLHost)\$($TargetSQLInstance)"
         }
 
-        $db | Add-Member -type NoteProperty -name TargetRubrikInstance -Value ""
-        $db | Add-Member -type NoteProperty -name TargetDataPath -Value $TargetDataPath
-        $db | Add-Member -type NoteProperty -name TargetLogPath -Value $TargetLogPath
-        $db | Add-Member -type NoteProperty -name RubrikDatabase -Value ""
-        $db | Add-Member -type NoteProperty -name RubrikRequest -Value ""
-        $DatabasesToBeMigrated += $db
+        $db.TargetRubrikInstance = ""
+        $db.TargetDataPath = $TargetDataPath
+        $db.TargetLogPath = $TargetLogPath
+        $db.RubrikDatabase = ""
+        $db.RubrikRequest = ""
+        [pscustomobject]$db
     }
 }
 #endregion
