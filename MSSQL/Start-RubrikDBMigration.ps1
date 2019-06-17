@@ -138,7 +138,7 @@ Import-Module SQLServer
 Import-Module FailoverClusters
 #endregion
 #region Rubrik Connection Information
-#$Credential = (Get-Credential -Message "Enter User ID and Password to connect to Rurbik Cluster" )
+#$Credential = (Get-Credential -Message "Enter User ID and Password to connect to Rubrik Cluster" )
 $ConnectRubrik = @{
     Server = $RubrikServer
     Credential = $Credential
