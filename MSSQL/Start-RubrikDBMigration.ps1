@@ -230,7 +230,7 @@ if($TurnOffOldDBs){
 }
 #endregion
 
-#Backup each database via an async job on Rubrik appliance
+#Backup each database via an async job on Rubrik cluster
 Foreach($Database in $DatabasesToBeMigrated){
     #Check if Source SQL Server is a FCI
     $GetWindowsCluster = @{
