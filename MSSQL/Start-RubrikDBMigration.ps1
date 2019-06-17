@@ -53,7 +53,7 @@
     Author:     Chris Lumnah
     Created:    10/20/2018
     Company:    Rubrik Inc
-    https://github.com/rubrik-devops/powershell-scripts
+    https://github.com/rubrikinc/rubrik-scripts-for-powershell
     Updated:    06/14/2016
     Updater:    Chris Lumnah
     Updates:    Script will take either a csv of values or continue to take values from the cmdline. 
