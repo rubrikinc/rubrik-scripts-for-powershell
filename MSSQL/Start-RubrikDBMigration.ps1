@@ -70,7 +70,7 @@ param(
     [String]$SourceSQLHost,
     
     [Parameter(ParameterSetName="CMDLINE")]
-    [String]$SourceSQLInstance = 'MSSQLSERVER',
+    [String]$SourceSQLInstance,
 
     [Parameter(ParameterSetName="CMDLINE")]
     [String[]]$Databases,
@@ -79,7 +79,7 @@ param(
     [String]$TargetSQLHost,
 
     [Parameter(ParameterSetName="CMDLINE")]
-    [String]$TargetSQLInstance = 'MSSQLSERVER',
+    [String]$TargetSQLInstance,
     
     [Parameter(ParameterSetName="CMDLINE")]
     [String]$TargetDataPath,
