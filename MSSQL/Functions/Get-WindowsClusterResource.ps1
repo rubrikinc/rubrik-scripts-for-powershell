@@ -7,12 +7,12 @@ function Get-WindowsClusterResource{
     Import-Module SqlServer
 
     $InvokeSQLCMD = @{
-        Query = "SELECT TOP (1) [NodeName] FROM [master].[sys].[dm_os_cluster_nodes]"
+        Query = "SELECT [NodeName] FROM [master].[sys].[dm_os_cluster_nodes] WHERE is_current_owner = 1"
         ServerInstance = $ServerInstance
     }
-    $Results = Invoke-SQLCMD @InvokeSQLCMD      
+    $Results = Invoke-SQLCMD @InvokeSQLCMD     
     if ([bool]($Results.PSobject.Properties.name -match "NodeName") -eq $true){  
-        $Cluster = Get-ClusterResource -Cluster $Results.NodeName | Where-Object {$_.ResourceType -like "*SQL Server*" -and $_.Name -like "*$Instance*" -and $_.Name -notlike "*Agent*"} 
+        $Cluster = Get-ClusterResource -Cluster $Results.NodeName | Where-Object {$_.ResourceType -like "SQL Server" -and $_.OwnerGroup -like "*$Instance*" } #-and $_.Name -notlike "*Agent*"} 
         return $Cluster
     }
 }
