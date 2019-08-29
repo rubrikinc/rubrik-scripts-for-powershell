@@ -76,7 +76,7 @@ AS
 (
 	select 
 		db.name
-		, sum(mf.size * 8 /1024) DBTotalSizeMB
+		,convert(bigint,sum(mf.size/128.0)) DBTotalSizeMB
 
 	FROM sys.databases db
 	JOIN sys.master_files mf ON db.database_id = mf.database_id
