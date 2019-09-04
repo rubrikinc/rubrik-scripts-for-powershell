@@ -226,11 +226,13 @@ $SystemDatabaseList = @('master', 'model', 'msdb', 'SSISDB', 'distribution')
 if ($AvailabilityGroupName) {
     $GetRubrikDatabase = @{
         HostName = $AvailabilityGroupName
+        PrimaryClusterID = "local"
     }
 }
 else {
     $GetRubrikDatabase = @{
         ServerInstance = $SQLServerInstance
+        PrimaryClusterID = "local"
     }
 }
 
@@ -265,10 +267,11 @@ foreach ($RubrikDatabase in $RubrikDatabases) {
     $db | Add-Member -type NoteProperty -name AvailabilityGroup -Value $AvailabilityGroupName
     $db | Add-Member -type NoteProperty -name RubrikRequest -Value ""
     
-    $db | Add-Member -type NoteProperty -name RubrikSLADomain -Value $RubrikDatabase.effectiveSlaDomainName
     if (-not ([string]::IsNullOrEmpty($SLAName))) {
         $RubrikSLA = Get-RubrikSLA -Name $SLAName 
         $db | Add-Member -type NoteProperty -name RubrikSLADomain -Value $RubrikSLA.Name
+    }else{
+        $db | Add-Member -type NoteProperty -name RubrikSLADomain -Value $RubrikDatabase.effectiveSlaDomainName
     }
 
     if($ExclusionList -contains $RubrikDatabase.name  ){
