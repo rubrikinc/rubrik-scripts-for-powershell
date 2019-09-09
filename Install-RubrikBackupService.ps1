@@ -122,7 +122,20 @@ configuration LocalAdministrators{
     }
 }
 
+#validating the Servername and if it is online
+$ValidComputerList=@()
 foreach($Computer in $ComputerName){
+    $isValidComputer = (Test-Connection -ComputerName $Computer -Count 1 -ErrorAction SilentlyContinue)
+    if ($isValidComputer){
+        Write-Verbose "$Computer, is up"
+        $ValidComputerList +=$isValidComputer | ForEach-Object{ [System.Net.Dns]::Resolve($($_.ProtocolAddress)).HostName}
+    }
+    else{
+        Write-Warning "Could not connect to server $Computer, the RBS will not be installed on this server!" 
+    }  
+}
+
+foreach($Computer in $ValidComputerList){
     $Computer
     #region Push the RubrikBackupService.zip to remote computer
     if (Test-Path -Path $OutFile)
