@@ -45,8 +45,8 @@ param( [String[]] $databases
 
 
 function ConvertFrom-ServerInstance($ServerInstance) {
-    if($ServerInstance -contains '\'){
-        $si = $ServerInstance -split '\'
+    if($ServerInstance.Contains('\')){
+        $si = $ServerInstance.Split('\')
         $return = New-Object psobject -Property @{'hostname'= $si[0];'instancename'=$si[1]}
     } else {
         $return = New-Object psobject -Property @{'hostname'= $ServerInstance;'instancename'='MSSQLSERVER'}
