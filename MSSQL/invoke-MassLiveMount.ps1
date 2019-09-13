@@ -55,8 +55,8 @@ param(   [Parameter(Mandatory=$true)]
         )
 
 Function ConvertFrom-ServerInstance($ServerInstance) {
-    if($ServerInstance -contains '\'){
-        $si = $ServerInstance -split '\'
+    if($ServerInstance.Contains('\')){
+        $si = $ServerInstance.Split('\')
         $return = New-Object psobject -Property @{'hostname'= $si[0];'instancename'=$si[1]}
     } else {
         $return = New-Object psobject -Property @{'hostname'= $ServerInstance;'instancename'='MSSQLSERVER'}
@@ -72,7 +72,9 @@ Function Wait-RubrikRequests($reqs) {
 }
 
 $source = ConvertFrom-ServerInstance $SourceServerInstance
-$TargetInstance = (Get-RubrikSQLInstance -ServerInstance $TargetServerInstance)
+$target = ConvertFrom-ServerInstance $TargetServerInstance
+
+$TargetInstance = (Get-RubrikSQLInstance -ServerInstance $target.hostname -name $target.instancename)
 
 Write-Verbose "Begining unmount/cleanup process for: $($databases -join ",")"
 $unmount_reqs = Get-RubrikDatabaseMount -TargetInstanceId $TargetInstance.id | 
@@ -93,3 +95,18 @@ $mount_reqs = $sourceDBs | Get-RubrikDatabase |
         New-RubrikDatabaseMount -TargetInstanceId $TargetInstance.id -MountedDatabaseName "$($_.name)_LM" -RecoveryDateTime $date -id $_.id -confirm:$false
        }catch{$_}}
 if($mount_reqs) {Wait-RubrikRequests $mount_reqs}
+
+
+Write-Verbose "Validating the LM and generating reports"
+
+#validating DB mounteds
+$dbMounted = Get-RubrikDatabaseMount -TargetInstanceId $TargetInstance.id | Where-Object {$databases -contains $_.sourceDatabaseName -and $_.isrelic -ne 'TRUE'} 
+if($dbMounted){Write-Host "Databases mounted successfully -- [$($dbMounted.sourceDatabaseName -join ",")]" -ForegroundColor Green}
+
+#PITR not found
+$pitr_nf = $sourceDBs | Where-Object {$databases -contains $_.Name -and $dbMounted.sourceDatabaseName -notcontains $_.Name } 
+if($pitr_nf){Write-Host "Could not find the Recover Point Time [$RecoveryDateTime] for [$($pitr_nf.name -join ",")]" -ForegroundColor Yellow}
+
+#DB not found
+$DB_nf = $databases | where-object {$sourceDBs.name -notcontains $_}
+if($DB_nf){Write-Host "Databases not found at [$SourceServerInstance] -- [$($DB_nf -join ",")]" -ForegroundColor Red}
