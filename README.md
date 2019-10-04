@@ -2,6 +2,8 @@
 
 This repository is intended to provide useful Powershell scripts written for specific use cases. Below is an index of these scripts:
 
+NB: This is currently a work-in-progress.
+
 Name | Category | CDM Tested | CDM Versions | Description |
 --- | --- | --- | --- | --- |
 [Invoke-AzureBlobsProtect](Azure/Invoke-AzureBlobsProtect.ps1) | Azure | Yes | 5.x | AzCopy contents of a given Azure Blobs Container to a Rubrik Managed Volume (EAS)
@@ -13,7 +15,6 @@ Name | Category | CDM Tested | CDM Versions | Description |
 [Export-RubrikDatabasesJobFile.json](MSSQL/Export-RubrikDatabasesJobFile.json)| MSSQL | Add Testing |  | 
 [Export-RubrikDatabasesJob_V1.ps1](MSSQL/Export-RubrikDatabasesJob_V1.ps1)| MSSQL | Add Testing |  | 
 [export-sqlfilelist.ps1](MSSQL/export-sqlfilelist.ps1)| MSSQL | Add Testing |  | 
-[input.csv](MSSQL/input.csv)| MSSQL | Add Testing |  | 
 [invoke-databaserefresh.ps1](MSSQL/invoke-databaserefresh.ps1)| MSSQL | Add Testing |  | 
 [invoke-dbmaintenance.ps1](MSSQL/invoke-dbmaintenance.ps1)| MSSQL | Add Testing |  | 
 [invoke-exportsql.ps1](MSSQL/invoke-exportsql.ps1)| MSSQL | Add Testing |  | 
@@ -26,7 +27,6 @@ Name | Category | CDM Tested | CDM Versions | Description |
 [invoke-RubrikSqlMvBackup.ps1](MSSQL/invoke-RubrikSqlMvBackup.ps1)| MSSQL | Add Testing |  | 
 [invoke-RubrikSqlMvRestore.ps1](MSSQL/invoke-RubrikSqlMvRestore.ps1)| MSSQL | Add Testing |  | 
 [invoke-sqlondemand.ps1](MSSQL/invoke-sqlondemand.ps1)| MSSQL | Add Testing |  | 
-[JobFile.json](MSSQL/JobFile.json)| MSSQL | Add Testing |  | 
 [mass-livemount.ps1](MSSQL/mass-livemount.ps1)| MSSQL | Add Testing |  | 
 [Measure-IOFreeze.ps1](MSSQL/Measure-IOFreeze.ps1)| MSSQL | Add Testing |  | 
 [Parse-IOFreeze.ps1](MSSQL/Parse-IOFreeze.ps1)| MSSQL | Add Testing |  |
@@ -83,8 +83,8 @@ Name | Category | CDM Tested | CDM Versions | Description |
 [StoragePolicytoSLAv2.ps1](VM/StoragePolicytoSLAv2.ps1)| VM | Add Testing |  | 
 [VMDKRecovery.ps1](VM/VMDKRecovery.ps1)| VM | Add Testing |  | 
 [VolumeRecovery.ps1](VM/VolumeRecovery.ps1)| VM | Add Testing |  | 
-[export-vtpm-guardian-certs.ps1](VM/hyper-v-vtpm/export-vtpm-guardian-certs.ps1)| VM/hyper-v-vtpm | Add Testing |  | 
-[import-vtpm-guardian-certs.ps1](VM/hyper-v-vtpm/import-vtpm-guardian-certs.ps1)| VM/hyper-v-vtpm | Add Testing |  | 
+[export-vtpm-guardian-certs.ps1](VM/hyper-v-vtpm/export-vtpm-guardian-certs.ps1)| VM/hyper-v-vtpm | Yes | 5.x.x | Script to export Hyper-V Guardian Certificates from Hyper-V running vTPM
+[import-vtpm-guardian-certs.ps1](VM/hyper-v-vtpm/import-vtpm-guardian-certs.ps1)| VM/hyper-v-vtpm | Yes | 5.x.x | Script to import Hyper-V Guardian Certificates to a new Hyper-V host
 
 ## :blue_book: Documentation
 
