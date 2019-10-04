@@ -22,7 +22,8 @@ Server to install the Rubrik Backup Service On
     Name:               Install Rubrik Backup Service
     Created:            1/03/2019
     Author:             Chris Lumnah
-   
+
+   Pre-Requisites: This scripts requires WinRM and DSC to be supported inside a domain environment to work.
 #>
 
 param(
