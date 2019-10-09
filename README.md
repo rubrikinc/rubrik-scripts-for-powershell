@@ -4,6 +4,9 @@ This repository is intended to provide useful Powershell scripts written for spe
 
 NB: This is currently a work-in-progress.
 
+<details>
+  <summary>Expand to see index</summary>
+   
 Name | Category | CDM Tested | CDM Versions | Description |
 --- | --- | --- | --- | --- |
 [Invoke-AzureBlobsProtect](Azure/Invoke-AzureBlobsProtect.ps1) | Azure | Yes | 5.x | AzCopy contents of a given Azure Blobs Container to a Rubrik Managed Volume (EAS)
@@ -85,6 +88,7 @@ Name | Category | CDM Tested | CDM Versions | Description |
 [VolumeRecovery.ps1](VM/VolumeRecovery.ps1)| VM | Add Testing |  | 
 [export-vtpm-guardian-certs.ps1](VM/hyper-v-vtpm/export-vtpm-guardian-certs.ps1)| VM/hyper-v-vtpm | Yes | 5.x.x | Script to export Hyper-V Guardian Certificates from Hyper-V running vTPM
 [import-vtpm-guardian-certs.ps1](VM/hyper-v-vtpm/import-vtpm-guardian-certs.ps1)| VM/hyper-v-vtpm | Yes | 5.x.x | Script to import Hyper-V Guardian Certificates to a new Hyper-V host
+</details>
 
 ## :blue_book: Documentation
 
