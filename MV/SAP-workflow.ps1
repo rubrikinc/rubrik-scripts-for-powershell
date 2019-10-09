@@ -151,8 +151,8 @@ do {
 Write-Host "Successfully created Managed Volumnes - Data: $($sapDataMVObject.id) Archive: $($sapArchiveMVObject.id)" -ForegroundColor Green
 
 Write-host "Protecting New Managed Volumes with SLA: $($sapDataSLA)" -ForegroundColor Yellow
-$SLADataObj = Get-RubrikSLA -Name $sapDataSLA
-$SLAArchiveObj = Get-RubrikSLA -Name $sapArchiveSLA
+$SLADataObj = Get-RubrikSLA -Name $sapDataSLA -PrimaryClusterID local
+$SLAArchiveObj = Get-RubrikSLA -Name $sapArchiveSLA -PrimaryClusterID local
 $DataSLAPayload = @{
     managedIds = @(
         $sapDataMVObject.id
