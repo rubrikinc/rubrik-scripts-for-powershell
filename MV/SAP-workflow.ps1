@@ -94,14 +94,14 @@ $sapDataMV = Read-Host -Prompt "Please enter the Name of the new Rubrik Managed 
 [Int32]$sapDataMVSize = Read-Host -Prompt "Please enter the size of for this Managed Volume (GB)"
 $sapDataChannels = Read-Host -Prompt "Please enter the number of Channels (Default 1)"
 $sapDataClientIP = Read-Host -Prompt "Please enter the SAP Client IPs for access to this Managed Volume (Multiples can be seperated with a comma)"
-$sapDataSLA = Read-Host -Prompt "Please provide the SLA Name for the Data Managed Volume"
+$sapDataSLA = Read-Host -Prompt "Please provide an existing SLA Name for the Data Managed Volume"
 
 Write-Host "Managed Volume Configuration - Archive" -ForegroundColor Yellow
 $sapArchiveMV = Read-Host -Prompt "Please enter the Name of the new Rubrik Managed Volume for SAP Data Archive"
 [Int32]$sapArchiveMVSize = Read-Host -Prompt "Please enter the size of for this Managed Volume (GB)"
 $sapArchiveChannels = Read-Host -Prompt "Please enter the number of Channels (Default 1)"
 $sapArchiveClientIP = Read-Host -Prompt "Please enter the SAP Client IPs for access to this Managed Volume (Multiples can be seperated with a comma)"
-$sapArchiveSLA = Read-Host -Prompt "Please provide the SLA Name for the Archive Managed Volume"
+$sapArchiveSLA = Read-Host -Prompt "Please provide an existing SLA Name for the Archive Managed Volume"
 
 if(!$sapDataChannels){
     $sapDataChannels = 1
@@ -151,8 +151,8 @@ do {
 Write-Host "Successfully created Managed Volumnes - Data: $($sapDataMVObject.id) Archive: $($sapArchiveMVObject.id)" -ForegroundColor Green
 
 Write-host "Protecting New Managed Volumes with SLA: $($sapDataSLA)" -ForegroundColor Yellow
-$SLADataObj = Get-RubrikSLA -Name $sapDataSLA
-$SLAArchiveObj = Get-RubrikSLA -Name $sapArchiveSLA
+$SLADataObj = Get-RubrikSLA -Name $sapDataSLA -PrimaryClusterID local
+$SLAArchiveObj = Get-RubrikSLA -Name $sapArchiveSLA -PrimaryClusterID local
 $DataSLAPayload = @{
     managedIds = @(
         $sapDataMVObject.id
