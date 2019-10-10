@@ -69,9 +69,9 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
     }
 
     if ($psversiontable.PSVersion.Major -le 5) {
-        $token_response = Invoke-WebRequest -Uri $("https://"+$rubrik_ip+"/api/internal/session") -Headers $headers -Method POST -Body $(ConvertTo-Json $api_token_query)
+        $token_response = Invoke-WebRequest -Uri $("https://"+$rubrik_ip+"/api/internal/session") -Headers $headers -Method POST -Body $(ConvertTo-Json $api_token_query) -UseBasicParsing
     } else {
-        $token_response = Invoke-WebRequest -Uri $("https://"+$rubrik_ip+"/api/internal/session") -Headers $headers -Method POST -Body $(ConvertTo-Json $api_token_query) -SkipCertificateCheck
+        $token_response = Invoke-WebRequest -Uri $("https://"+$rubrik_ip+"/api/internal/session") -Headers $headers -Method POST -Body $(ConvertTo-Json $api_token_query) -SkipCertificateCheck -UseBasicParsing
     }
     return $token_response
 }
@@ -210,27 +210,34 @@ $userTokenObj = $userToken.Content | ConvertFrom-JSON
 Write-Host "Successfully Created Token for User: $($sapUsername)" -ForegroundColor Green
 Write-Host "Script Completed:" -ForegroundColor Green
 
-$results = "
-SAP Database Name: $($sapDBName)
+foreach($MVChannel in $DataMV.mainExport.channels){
 
-Login Details:
-Rubrik Cluster: $($global:rubrikConnection.server)
-Rubrik Username: $($createRubrikUser.username)
-API Token: $($userTokenObj.session.token)
+    $joinedPath = "$($MVChannel.ipAddress):$($MVChannel.mountPoint)`n"
+    $DataVolumes += $joinedPath
+    
+}
 
-Managed Volume Data Details:
-Managed Volume Name (Data): $($sapDataMVObject.name)
-Managed Volume ID (Data): $($sapDataMVObject.id)
-Managed Volume Size (Data): $($sapDataMVObject.volumeSize / 1GB) GB
-Managed Volume IP (Data): $($DataMV.mainExport.channels.ipAddress)
-Managed Volume Channel (Data): $($DataMV.mainExport.channels.mountPoint)
+foreach($MVChannel in $ArchiveMV.mainExport.channels){
 
-Managed Volume Archive Details:
-Managed Volume Name (Archive): $($sapArchiveMVObject.name)
-Managed Volume ID (Archive): $($sapArchiveMVObject.id)
-Managed Volume Size (Archive): $($sapArchiveMVObject.volumeSize / 1GB) GB
-Managed Volume IP (Archive): $($ArchiveMV.mainExport.channels.ipAddress)
-Managed Volume Channel (Archive): $($ArchiveMV.mainExport.channels.mountPoint)
+    $joinedPath = "$($MVChannel.ipAddress):$($MVChannel.mountPoint)`n"
+    $ArchiveVolumes += $joinedPath
+
+}
+
+$results = "#ScriptVariables
+
+SID=$([char]34)$($sapDBName)$([char]34)
+RUBRIK_CLUSTER=$([char]34)$($global:rubrikConnection.server)$([char]34)
+MV_ID_DATA=$([char]34)$($sapDataMVObject.id)$([char]34)
+MV_ID_LOGS=$([char]34)$($sapArchiveMVObject.id)$([char]34)
+API_TOKEN=$([char]34)$($userTokenObj.session.token)$([char]34)
+TOKEN_EXPIRES=$((get-date).adddays(+365).ToString('MMM dd yyyy'))
+
+#DataVolume(s)
+$($DataVolumes)
+
+#ArchiveVolume(s)
+$($ArchiveVolumes)
 "
 
 write-host $results -ForegroundColor Green
