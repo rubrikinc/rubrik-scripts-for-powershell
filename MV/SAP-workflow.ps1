@@ -76,6 +76,63 @@ public class TrustAllCertsPolicy : ICertificatePolicy {
     return $token_response
 }
 
+
+function Create-RubrikMV () {
+
+    [CmdletBinding()]
+    Param (
+        [string]$rubrik_ip,
+        [string]$rubrik_user,
+        [string]$rubrik_pass,
+        [string]$MVName,
+        [int64]$VolumeSize,
+        [int32]$channels,
+        [string]$appTag,
+        [PSCustomObject]$exportConfig
+    )
+
+    $headers = @{
+        Authorization = "Basic {0}" -f [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f $rubrik_user,$rubrik_pass)))
+        Accept = 'application/json'
+    }
+    if ($psversiontable.PSVersion.Major -le 5) {
+        try {
+            # This block prevents errors from self-signed certificates
+            Add-Type -TypeDefinition @"
+using System.Net;
+using System.Security.Cryptography.X509Certificates;
+public class TrustAllCertsPolicy : ICertificatePolicy {
+    public bool CheckValidationResult(
+        ServicePoint srvPoint, X509Certificate certificate,
+        WebRequest request, int certificateProblem) {
+        return true;
+    }
+}
+"@
+            [System.Net.ServicePointManager]::CertificatePolicy = New-Object -TypeName TrustAllCertsPolicy
+            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
+        }
+        catch {
+
+        }
+    }
+
+    $mv_payload = @{
+        volumeSize = $VolumeSize
+        name = $MVName
+        numChannels = $channels
+        applicationTag = $appTag
+        exportConfig = $exportConfig
+    }
+
+    if ($psversiontable.PSVersion.Major -le 5) {
+        $mv_response = Invoke-WebRequest -Uri $("https://"+$rubrik_ip+"/api/internal/managed_volume?limit=9999") -Headers $headers -Method POST -Body $(ConvertTo-Json $mv_payload) -UseBasicParsing
+    } else {
+        $mv_response = Invoke-WebRequest -Uri $("https://"+$rubrik_ip+"/api/internal/managed_volume?limit=9999") -Headers $headers -Method POST -Body $(ConvertTo-Json $mv_payload) -SkipCertificateCheck -UseBasicParsing
+    }
+    return $mv_response
+}
+
 # Connect to Rubrik
 $credPath = ".\RubrikCred.xml"
 $cred = Get-Credential -Message "Please provide Rubrik Credentials"
@@ -111,6 +168,9 @@ if(!$sapArchiveChannels){
     $sapArchiveChannels = 1
 }
 
+$BSTRCurrent = `
+    [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($cred.Password)
+
 $BSTR = `
     [System.Runtime.InteropServices.Marshal]::SecureStringToBSTR($sapPassword)
 
@@ -124,6 +184,10 @@ $createRubrikUser = Invoke-RubrikRESTCall -Endpoint 'user' -api internal -Method
 Write-Host "$($createRubrikUser.username) Successfully Created - ID: $($createRubrikUser.id)" -ForegroundColor Green
 
 Write-Host "Creating Managed Volumes for Data & Archive" -ForegroundColor Yellow
+
+$sapDataClientIP = $sapDataClientIP.split(',') -replace ',', '' -replace ' ', ''
+$sapArchiveClientIP = $sapArchiveClientIP.split(',') -replace ',','' -replace ' ', ''
+
 $sapDataExportConfig = @{
     hostPatterns = @(
         $sapDataClientIP
@@ -135,8 +199,13 @@ $sapArchiveExportConfig = @{
         $sapArchiveClientIP
     )
 }
-$sapDataMVObject = New-RubrikManagedVolume -Name $sapDataMV -VolumeSize ($sapDataMVSize * 1GB) -Channels $sapDataChannels -applicationTag SapHana -exportConfig $sapArchiveExportConfig
-$sapArchiveMVObject = New-RubrikManagedVolume -Name $sapArchiveMV -VolumeSize ($sapArchiveMVSize * 1GB) -Channels $sapArchiveChannels -applicationTag SapHana -exportConfig $sapArchiveExportConfig
+
+$sapCreateMVData = Create-RubrikMV -rubrik_ip $rubrikCluster -rubrik_user $cred.UserName -rubrik_pass ([System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTRCurrent)) -MVName $sapDataMV -VolumeSize ($sapDataMVSize * 1GB) -channels $sapDataChannels -appTag SapHana -exportConfig $sapDataExportConfig
+$sapCreateMVArchive = Create-RubrikMV -rubrik_ip $rubrikCluster -rubrik_user $cred.UserName -rubrik_pass ([System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTRCurrent)) -MVName $sapArchiveMV -VolumeSize ($sapArchiveMVSize * 1GB) -channels $sapArchiveChannels -appTag SapHana -exportConfig $sapArchiveExportConfig
+
+$sapDataMVObject = $sapCreateMVData | ConvertFrom-JSON
+$sapArchiveMVObject = $sapCreateMVArchive | ConvertFrom-JSON
+
 do{
 
     $DataMV = Invoke-RubrikRESTCall -Endpoint "managed_volume/$($sapDataMVObject.id)" -api internal -Method GET
@@ -205,7 +274,7 @@ $applyMVRole = Invoke-RubrikRESTCall -Endpoint 'authorization/role/managed_volum
 
 Write-Host "Generating 365 Day API Token for User $($createRubrikUser.username)" -ForegroundColor Yellow
 $gloablOrg = Get-RubrikOrganization -isGlobal:$true
-$userToken = Get-RubrikAPIToken -rubrik_ip $rubrikCluster -rubrik_user $sapUsername -rubrik_pass ([System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)) -rubrik_token_name "SAP_Test" -rubrik_global_org_id $gloablOrg.id
+$userToken = Get-RubrikAPIToken -rubrik_ip $rubrikCluster -rubrik_user $sapUsername -rubrik_pass ([System.Runtime.InteropServices.Marshal]::PtrToStringAuto($BSTR)) -rubrik_token_name ("SAP$((get-date).adddays(+365).ToString('MMMddyyyy'))") -rubrik_global_org_id $gloablOrg.id
 $userTokenObj = $userToken.Content | ConvertFrom-JSON
 Write-Host "Successfully Created Token for User: $($sapUsername)" -ForegroundColor Green
 Write-Host "Script Completed:" -ForegroundColor Green
@@ -246,3 +315,6 @@ $output_folder = '.'
 $output_file_name = $output_folder + "\" + $(get-date -uFormat "%Y%m%d-%H%M%S") + "-$($sapDBName)-MV_Creation.txt"
 
 $results > $output_file_name
+
+Disconnect-Rubrik
+Remove-Variable * -ErrorAction SilentlyContinue
