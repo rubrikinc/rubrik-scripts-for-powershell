@@ -13,10 +13,6 @@ It is a mandatory parameter, the script will export supplied DBs to the given ta
 It is a mandatory parameter, source SQL Server Instance that has the DBs, e.g. SQLserv01\Prod
 For AG server environment, use the Availability group insted of the replica nodes!
 
-.PARAMETER RubrikServer
-It will be used to get the replica names if the target instance is an Availability Group
-Ex. $RubrikServer = "172.21.8.51"
-
 .PARAMETER TargetServerInstance
 It is a mandatory parameter, target SQL Server Instance that has the DBs, e.g. SQLserv01\DEV
 For AG server environment, use the Availability group insted of the replica nodes!
@@ -45,7 +41,7 @@ Refreshing a gorup of databases from Prod AG to DEV ag.
     $RubrikCredential = (Get-Credential -Message 'Please enter your Rubrik credentials')
     Connect-Rubrik -Server $RubrikServer -Credential $RubrikCredential
 
-    .\invoke-RubrikDatabaseAGRefresh.ps1 -databases "dbAG01","dbAG02","dbAG03" -SourceServerInstance "PROD_AG_name" -RubrikServer = "172.21.8.51" -TargetServerInstance "DEV_AG_name" -LatestRecoveryPoint
+    .\invoke-RubrikDatabaseAGRefresh.ps1 -databases "dbAG01","dbAG02","dbAG03" -SourceServerInstance "PROD_AG_name" -TargetServerInstance "DEV_AG_name" -LatestRecoveryPoint
         
 
 .NOTES
@@ -66,9 +62,6 @@ param(
 
     [Parameter(Mandatory=$true)]
     [String] $SourceServerInstance,
-
-    [Parameter(Mandatory=$true)]
-    [String] $RubrikServer,
 
     [Parameter(Mandatory=$true)]
     [String] $TargetServerInstance,
@@ -149,6 +142,7 @@ if($TargetServerInstance -contains '\'){
 }
 
 $isAG = $False
+$RubrikServer = $global:RubrikConnection.server
 $target = Get-RubrikSQLInstance -Name $tgtInstanceName -ServerInstance $tgtHostName|Select-Object @{n='rootName';e={$($_.rootProperties).rootName}},@{n='rootId';e={$($_.rootProperties).rootId}},@{n='instanceId';e={$_.id}},@{n='instanceName';e={$_.name}},RubrikRequest 
 if (!$target){
     $isAG = $true
@@ -182,15 +176,41 @@ foreach($db in $databases) {
 
             if (!$TargetDataFilePath -or !$TargetLogFilePath){
                 Write-Verbose "If exists, Get the file path from target DB"
-                try{if($targetdb){$sourcefiles = Get-RubrikDatabaseFiles -Id $targetdb.id -RecoveryDateTime (Get-Date $targetdb.latestRecoveryPoint) |Select-Object LogicalName,@{n='exportPath';e={$_.OriginalPath}},@{n='newFileName';e={$_.OriginalName}}}
-                    if(!$sourcefiles -xor !$targetdb){
+                try{
+                    if($targetdb){
+                        Write-Verbose "Database [$db] exists on target DB"
+                        if (!$targetdb.latestRecoveryPoint){
+                            Write-Verbose "There are no snapshot for Database [$db] at [$TargetServerInstance], getting file location from SQL Server"
+                            $strSQL = ";WITH CTE_filePath as (
+                            SELECT name as 'LogicalName'		
+		                            ,REVERSE(SUBSTRING(REVERSE(physical_name),0, CHARINDEX('\', REVERSE(physical_name)))) as FileName
+		                            ,REVERSE(SUBSTRING(REVERSE(physical_name),CHARINDEX('\', REVERSE(physical_name))+1,100)) as Path
+                            FROM sys.master_files 
+                            WHERE DB_NAME(database_id)='$($targetdb.name)'
+                            )
+                            SELECT logicalName, path as exportPath, FileName as newFilename FROM CTE_filePath
+                            "
+                            $TargerSQLHost = $target | Where-Object {$_.role -eq "PRIMARY"}
+                            
+                            $DatabaseFiles = @()
+                            $DatabaseFiles = (Invoke-Sqlcmd -ServerInstance $("$($TargerSQLHost.rootName)\$($TargerSQLHost.instanceName)").Replace("\MSSQLSERVER","") -Database "master" -Query $strSQL -QueryTimeout 0)
+                            $sourcefiles = @()
+                            foreach ($DatabaseFile in $DatabaseFiles)
+                            {
+                                $sourcefiles += @{logicalName=$DatabaseFile.logicalName;exportPath=$DatabaseFile.exportPath;newFilename=$DatabaseFile.newFilename}       
+                            }
+                        }else{
+                            $sourcefiles = Get-RubrikDatabaseFiles -Id $targetdb.id -RecoveryDateTime (Get-Date $targetdb.latestRecoveryPoint) |Select-Object LogicalName,@{n='exportPath';e={$_.OriginalPath}},@{n='newFilename';e={$_.OriginalName}}
+                        }
+                    }
+                    if(!$sourcefiles -or !$targetdb){
                         Write-Verbose "Database [$db] does not exists on target DB, using the File Paths from source"                            
-                        $sourcefiles = Get-RubrikDatabaseFiles -Id $sourcedb.id -RecoveryDateTime $srcRecoveryDateTime |Select-Object LogicalName,@{n='exportPath';e={$_.OriginalPath}},@{n='newFileName';e={$_.OriginalName}}
+                        $sourcefiles = Get-RubrikDatabaseFiles -Id $sourcedb.id -RecoveryDateTime $srcRecoveryDateTime |Select-Object LogicalName,@{n='exportPath';e={$_.OriginalPath}},@{n='newFilename';e={$_.OriginalName}}
                     }
                 }catch{Write-Warning -Message "$($targetdb.latestRecoveryPoint) is not recoverable";continue}
             }else{
                 Write-Verbose "Using file path [$TargetDataFilePath] and [$TargetLogFilePath] for [$db]"                
-                try{$sourcefiles = Get-RubrikDatabaseFiles -Id $sourcedb.id -RecoveryDateTime $srcRecoveryDateTime |Select-Object LogicalName,@{n='exportPath';e={if($_.fileType -eq "Data"){$TargetDataFilePath}else{$TargetLogFilePath}}},@{n='newFileName';e={$_.OriginalName}}
+                try{$sourcefiles = Get-RubrikDatabaseFiles -Id $sourcedb.id -RecoveryDateTime $srcRecoveryDateTime |Select-Object LogicalName,@{n='exportPath';e={if($_.fileType -eq "Data"){$TargetDataFilePath}else{$TargetLogFilePath}}},@{n='newFilename';e={$_.OriginalName}}
                 }catch{Write-Warning -Message "$srcRecoveryDateTime is not recoverable"; continue}
             }
 
@@ -204,7 +224,7 @@ foreach($db in $databases) {
                         -FinishRecovery:$FinishRecovery `
                         -Overwrite `
                         -TargetFilePaths $sourcefiles `
-                        -Confirm:$false
+                        -Confirm:$false 
                 }catch{$_}
             }
             #if AG, remove DB of AG, setup Logshipping, add the DB back to AG and remove Logshipping
@@ -223,8 +243,8 @@ foreach($db in $databases) {
                         }CATCH{Write-Warning -Message "Could not remove the database [$db] of AG [$TargetServerInstance] - node $($primary.rootName) - Message: $_"; break}                        
                     }
 
-                    FOREACH($Replica in $target | Sort-Object Role -Descending)
-                    {                                   
+                    FOREACH($Replica in $target | Sort-Object Role -Descending )
+                    {
                         try{
                             Write-Verbose "Exporting database [$db] to node [$($Replica.rootName)] - AG [$TargetServerInstance]"
                             $RubrikRequest = @()
@@ -243,6 +263,7 @@ foreach($db in $databases) {
                     #wait for Export completion for all nodes
                     foreach($Replica in $target | Sort-Object Role )
                     {
+                        Write-Verbose "Checking export progress for $($Replica.rootName)"
                         Get-RubrikRequestInfo -RubrikRequest $Replica.RubrikRequest
                     }
 
@@ -254,10 +275,12 @@ foreach($db in $databases) {
                             Write-Verbose "Setting $($DB) to RECOVERY on $($Replica.rootName)\$($Replica.instanceName)"
                             $Query = "RESTORE DATABASE [$db] WITH RECOVERY;"                                
                             Invoke-Sqlcmd -ServerInstance $("$($Replica.rootName)\$($Replica.instanceName)").Replace("\MSSQLSERVER","") -Database "master" -Query $Query
-                        }
+                        }                       
+                    }
+                    foreach($Replica in $target | Sort-Object Role){
                         Write-Verbose "Adding $($DB) to $($TargetServerInstance) on $($Replica.rootName)\$($Replica.instanceName)"
                         try{
-                            Add-SqlAvailabilityDatabase -Path "SQLSERVER:\Sql\$($Replica.rootName)\$($Replica.instanceName.replace("MSSQLSERVER","DEFAULT"))\AvailabilityGroups\$($TargetServerInstance)" -Database $db
+                            Add-SqlAvailabilityDatabase -Path "SQLSERVER:\Sql\$($Replica.rootName)\$($Replica.instanceName.replace("MSSQLSERVER","DEFAULT"))\AvailabilityGroups\$($TargetServerInstance)" -Database $db                            
                         }catch{$_}
                     }
                 }else{Write-Warning -Message "The database [$db] is not part of AG [$TargetServerInstance]!!!"; continue}
