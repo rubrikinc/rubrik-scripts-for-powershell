@@ -121,7 +121,8 @@ function Get-RubrikRequestInfo
             Write-Progress -Activity "$($RubrikRequestInfo.id)" -status "Job Queued" -percentComplete (0)
         }
         Start-Sleep -Seconds 1
-    } while ($RubrikRequestInfo.status -notin $ExitList) 	
+    } while ($RubrikRequestInfo.status -notin $ExitList)
+    return $RubrikRequestInfo
 }
 
 
@@ -217,6 +218,7 @@ foreach($db in $databases) {
             #if not AG, Export the database
             if ($isAG -eq $False ){
                 try{
+                Write-Verbose "Exporting database [$db] to instance [$($tgtHostName)\$tgtInstanceName]"
                 $Result = Export-RubrikDatabase -Id $sourcedb.id `
                         -TargetInstanceId $target.instanceId `
                         -TargetDatabaseName $sourcedb.name `
@@ -225,6 +227,8 @@ foreach($db in $databases) {
                         -Overwrite `
                         -TargetFilePaths $sourcefiles `
                         -Confirm:$false 
+
+                         Get-RubrikRequestInfo -RubrikRequest $Result
                 }catch{$_}
             }
             #if AG, remove DB of AG, setup Logshipping, add the DB back to AG and remove Logshipping
@@ -246,6 +250,18 @@ foreach($db in $databases) {
                     FOREACH($Replica in $target | Sort-Object Role -Descending )
                     {
                         try{
+                            Write-Verbose "Dropping database [$db] from node [$($Replica.rootName)]"
+                            $strSQL = "IF EXISTS(SELECT 1 FROM sys.databases 
+                                                  WHERE Name = '$db')
+                                        BEGIN
+                                            DROP DATABASE $db
+                                        END"
+                            try{
+                                Invoke-Sqlcmd -ServerInstance $("$($TargerSQLHost.rootName)\$($TargerSQLHost.instanceName)").Replace("\MSSQLSERVER","") -Database "master" -Query $strSQL -QueryTimeout 0
+                                Write-Verbose "Database [$db] deleted from replica [$($Replica.rootName)]"
+                            }catch{$_}
+                            
+
                             Write-Verbose "Exporting database [$db] to node [$($Replica.rootName)] - AG [$TargetServerInstance]"
                             $RubrikRequest = @()
                             $RubrikRequest = Export-RubrikDatabase -Id $sourcedb.id `
@@ -264,25 +280,31 @@ foreach($db in $databases) {
                     foreach($Replica in $target | Sort-Object Role )
                     {
                         Write-Verbose "Checking export progress for $($Replica.rootName)"
-                        Get-RubrikRequestInfo -RubrikRequest $Replica.RubrikRequest
+                        $ResultExport = Get-RubrikRequestInfo -RubrikRequest $Replica.RubrikRequest
+                        if ($ResultExport.status -eq "FAILED"){
+                            Write-Warning "Export failed for $($Replica.rootName), cancelling the operation";
+                            Write-Host $ResultExport.error.message
+                            return;
+                        }else{Write-Verbose "Export completed successfully for $($Replica.rootName)"}
                     }
 
                     #Adding database back to AG
                     $Replica = @()
                     foreach($Replica in $target | Where-Object role -eq "Primary")
                     {
-                        if($Replica.role -eq "PRIMARY"){
-                            Write-Verbose "Setting $($DB) to RECOVERY on $($Replica.rootName)\$($Replica.instanceName)"
-                            $Query = "RESTORE DATABASE [$db] WITH RECOVERY;"                                
-                            Invoke-Sqlcmd -ServerInstance $("$($Replica.rootName)\$($Replica.instanceName)").Replace("\MSSQLSERVER","") -Database "master" -Query $Query
-                        }                       
-                    }
-                    foreach($Replica in $target | Sort-Object Role){
+                        Write-Verbose "Setting $($DB) to RECOVERY on $($Replica.rootName)\$($Replica.instanceName)"
+                        $Query = "RESTORE DATABASE [$db] WITH RECOVERY;"                                
+                        Invoke-Sqlcmd -ServerInstance $("$($Replica.rootName)\$($Replica.instanceName)").Replace("\MSSQLSERVER","") -Database "master" -Query $Query
+                        
                         Write-Verbose "Adding $($DB) to $($TargetServerInstance) on $($Replica.rootName)\$($Replica.instanceName)"
                         try{
                             Add-SqlAvailabilityDatabase -Path "SQLSERVER:\Sql\$($Replica.rootName)\$($Replica.instanceName.replace("MSSQLSERVER","DEFAULT"))\AvailabilityGroups\$($TargetServerInstance)" -Database $db                            
                         }catch{$_}
                     }
+
+                    Write-Verbose "Checking AG status for [$($DB)]"                    
+                    Get-ChildItem "SQLSERVER:\Sql\$($Replica.rootName)\$($Replica.instanceName.replace("MSSQLSERVER","DEFAULT"))\AvailabilityGroups\$($TargetServerInstance)\DatabaseReplicaStates" | Test-SqlDatabaseReplicaState | Where-Object {$_.Name -eq $db}
+
                 }else{Write-Warning -Message "The database [$db] is not part of AG [$TargetServerInstance]!!!"; continue}
             }    
         }
