@@ -246,7 +246,7 @@ foreach($db in $databases) {
                             Remove-SqlAvailabilityDatabase -Path "SQLSERVER:\Sql\$($primary.rootName)\$($primary.instanceName.replace("MSSQLSERVER","DEFAULT"))\AvailabilityGroups\$($TargetServerInstance)\AvailabilityDatabases\$db"
                         }CATCH{Write-Warning -Message "Could not remove the database [$db] of AG [$TargetServerInstance] - node $($primary.rootName) - Message: $_"; break}                        
                     }
-
+                    Start-Sleep -Seconds 15
                     FOREACH($Replica in $target | Sort-Object Role -Descending )
                     {
                         try{
@@ -261,6 +261,8 @@ foreach($db in $databases) {
                                 Write-Verbose "Database [$db] deleted from replica [$($Replica.rootName)]"
                             }catch{$_}
                             
+                            Write-Verbose "Refreshing node [$($Replica.rootName)] at Rubrki Cluster"
+                            Get-RubrikHost -Name $($Replica.rootName) | Update-RubrikHost | Out-Null
 
                             Write-Verbose "Exporting database [$db] to node [$($Replica.rootName)] - AG [$TargetServerInstance]"
                             $RubrikRequest = @()
