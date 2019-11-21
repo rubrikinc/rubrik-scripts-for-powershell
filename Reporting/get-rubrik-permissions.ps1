@@ -1,10 +1,17 @@
-Import-Module Rubrik
+<#
+.SYNOPSIS
+Creates and Polls Rubrik Permissions to build a custom HTML Report
+.DESCRIPTION
+Finds the specified Object as determined by the user, discovers all LDAP and LOCAL domains and their members; checks each user ID for authroization against the specified object
+.EXAMPLE
+.\get-rubrik-permissions.ps1
+.NOTES
+    Name:               Check Permission Authorization
+    Created:            11/21/2019
+    Author:             Andrew Draper
+#>
 
-# 9. List of permissions and roles/ for a specific server – who can backup/restore data of a specific server
-# Script Flow ->
-#     1. Get All User/Groups/Roles from Rubrik
-#     2. Get the Object to check
-#     3. Determine Users and Roles with permissions to this object (e.g. Specific Managed Authorization, Admin Roles, AD Group Membership)
+Import-Module Rubrik
 
 $HTML_Check = "<p>&#9989;</p>"
 $HTML_Cross = "<p>&#10060;</p>"
