@@ -116,6 +116,7 @@ foreach($Database in $Databases){
         $GetRubrikDatabase = @{
             Name = $Database
             HostName = $SourceSQLHost 
+            Instance = 'MSSQLSERVER'
         }
     }else{
         $SourceSQLServerInstance = Get-SQLServerInstance -HostName $SourceSQLHost -InstanceName $SourceSQLInstance
@@ -138,7 +139,9 @@ foreach($Database in $Databases){
             }
         }
     }
-    $RubrikDatabase = Get-RubrikDatabase @GetRubrikDatabase | Select-object -First 1
+    
+    $RubrikDatabase = Get-RubrikDatabase @GetRubrikDatabase | Where-Object {$_.isRelic -eq $false} 
+    #| Select-object -First 1
     
     #endregion
     #region Get information about the Target SQL Server
@@ -179,7 +182,7 @@ foreach($Database in $Databases){
         $RubrikDatabaseFiles = Get-RubrikDatabaseFiles -Id $RubrikDatabase.id -RecoveryDateTime $DatabaseRecoveryPoint
 
         foreach ($RubrikDatabaseFile in $RubrikDatabaseFiles){
-            if ($RubrikDatabaseFile.islog -eq $true){
+            if ($RubrikDatabaseFile.fileType -eq "Log"){
                 $TargetFiles += [pscustomobject]@{
                     logicalName = $RubrikDatabaseFile.logicalName
                     exportPath = $TargetLogPath

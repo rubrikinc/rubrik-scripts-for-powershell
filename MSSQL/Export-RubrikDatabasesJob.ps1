@@ -227,8 +227,9 @@ foreach ($Database in $JobFile.Databases) {
     Write-Host "Restoring $($ExportRubrikDatabase.TargetDatabaseName) to $($ExportRubrikDatabase.recoveryDateTime) onto $($GetRubrikSQLInstance.HostName)\$($GetRubrikSQLInstance.Name)"
     $RubrikRequest = Export-RubrikDatabase @ExportRubrikDatabase -Verbose
     $RubrikRequestInfo = Get-RubrikRequestInfo -RubrikRequest $RubrikRequest -Type mssql
+    $RubrikRequestInfo.error
     #The below code only needs to be run if we hit a bug with earlier editions of Rubrik V5
-    if ($RubrikRequestInfo.error -like "*Cannot create a file when that file already exists*"){
+    if ($RubrikRequestInfo.error -like "*Cannot create a file when that file already exists*" -or $RubrikRequestInfo.error -like "*does not have enough space*"){
         Write-Host "First attempt of restoring $($ExportRubrikDatabase.TargetDatabaseName) to $($ExportRubrikDatabase.recoveryDateTime) onto $($GetRubrikSQLInstance.HostName)\$($GetRubrikSQLInstance.Name) failed."
         Write-Host "Will try alternative method to restore database"
         Remove-Database -DatabaseName $($ExportRubrikDatabase.TargetDatabaseName) -ServerInstance $TargetSQLServerInstance 
