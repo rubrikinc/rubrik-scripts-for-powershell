@@ -67,7 +67,7 @@ Import-Module Rubrik
 $Credential = Import-CliXml -Path $CredentialFile
 Connect-Rubrik -Server $Server -Credential $Credential | Out-Null
 
-$RubrikFileSet = Get-RubrikFileset -Name $FileSetName -HostName $HostName
+$RubrikFileSet = Get-RubrikFileset -Name $FileSetName -HostName $HostName | Where-Object {$_.isRelic -eq 'False'}
 
 $RubrikRequest = New-RubrikSnapshot -id $RubrikFileSet.id -SLA $SLADomain -Confirm:$false
 

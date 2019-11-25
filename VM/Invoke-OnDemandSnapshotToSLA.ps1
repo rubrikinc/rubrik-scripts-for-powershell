@@ -60,24 +60,24 @@ https://github.com/rubrikinc/PowerShell-Module
 [CmdletBinding()]
 param(
   # The Rubrik SLA Policy to take snapshots from
-  [Parameter(Mandatory=$True,
-  HelpMessage="Enter one or more source SLA Domains separated by commas.")]
+  [Parameter(Mandatory = $True,
+    HelpMessage = "Enter one or more source SLA Domains separated by commas.")]
   [array]$SLADomains,
 
   # The target SLA to use for making the On Demand Snapshot
-  [Parameter(Mandatory=$True,
-  HelpMessage="Enter the target SLA Domain.")]
+  [Parameter(Mandatory = $True,
+    HelpMessage = "Enter the target SLA Domain.")]
   [string]$targetSLADomain,
 
   # The credentials file for Rubrik
-  [Parameter(Mandatory=$True,
-  HelpMessage="Enter the Rubrik credentials file name.")]
-  [string]$creds,
+  [Parameter(Mandatory = $false,
+    HelpMessage = "Enter the Rubrik credentials file name.")]
+  [string]$creds = "c:\temp\rubrikcred.xml",
 
   # The IP address or hostname of a node in the Rubrik cluster.
-  [Parameter(Mandatory=$True,
-  HelpMessage="Enter the IP address or hostname of a node in the Rubrik Cluster.")]
-  [string]$rubrikNode
+  [Parameter(Mandatory = $false,
+    HelpMessage = "Enter the IP address or hostname of a node in the Rubrik Cluster.")]
+  [string]$rubrikNode = "amer1-rbk01"
 )
 
 #Load Rubrik module and connect
@@ -91,19 +91,52 @@ $Snappables = @()
 
 #For each domain, attempt to take on demand snapshot to archival SLA DOMAIN
 write-host ("")
-foreach($SLA in $SLADomains){
-    Write-Host ("Gathering snappables from SLA Domain $SLA...")
-    $Snappables += Get-RubrikFileset -SLA $SLA
-    $Snappables += Get-RubrikVM -SLA $SLA
-    $Snappables += Get-RubrikManagedVolume -SLA $SLA
-    $Snappables += Get-RubrikDatabase -SLA $SLA
-}
+Write-Host ("Gathering snappables from SLA Domain $SLA...")
+foreach ($SLA in $SLADomains) {
+  
+  Write-Host (".....Getting Filesets that are not Passthrough...")
+  $Snappables += (Get-RubrikFileset -SLA $SLA -PrimaryClusterID local | Where-Object {$_.isPassthrough -eq $false})
 
+  Write-Host (".....Getting SQL Server Databases...")
+  $Snappables += Get-RubrikDatabase -SLA $SLA -PrimaryClusterID local
+    
+  Write-Host (".....Getting Oracle Databases...")
+  $Snappables += Get-RubrikOracleDB -SLA $SLA -PrimaryClusterID local
+
+  Write-Host (".....Getting VMWare VMs...")  
+  $Snappables += Get-RubrikVM -SLA $SLA -PrimaryClusterID local
+  
+  Write-Host (".....Getting VMWare VCD VAPPS...")  
+  $Snappables += Get-RubrikVApp -SLA $SLA -PrimaryClusterID local
+
+  Write-Host (".....Getting Hyper-V VMs...")  
+  $Snappables += Get-RubrikHyperVVM -SLA $SLA -PrimaryClusterID local
+
+  Write-Host (".....Getting Nutanix VMs...")  
+  $Snappables += Get-RubrikNutanixVM -SLA $SLA -PrimaryClusterID local
+  
+  Write-Host (".....Getting Volume Groups...")  
+  $Snappables += Get-RubrikVolumeGroup -SLA $SLA -PrimaryClusterID local
+    
+}
 #Loop through each snappable and take an On Demand Snapshot
-write-host ("")
-foreach($Snap in $Snappables){
-    #renew Rubrik connection in case snapshot took too long
-    Connect-Rubrik -Server $rubrikNode -Credential (Import-Clixml $creds) | Out-Null
-    write-host ("Taking snapshot of $($snap.name)...")
-    $snap | New-RubrikSnapshot -SLA $targetSLADomain -Confirm:$false
+
+#renew Rubrik connection in case snapshot took too long
+Connect-Rubrik -Server $rubrikNode -Credential (Import-Clixml $creds) | Out-Null
+foreach ($Snap in $Snappables) {
+  write-host ("Taking snapshot of $($snap.name)...")
+  $snap | New-RubrikSnapshot -SLA $targetSLADomain -Confirm:$false 
+}
+#-------------------------------------------------------------------------------
+# Now lets go after managed volumes
+# Managed Volumes are not snappables so they need to be handled differently than the above
+foreach ($SLA in $SLADomains) {
+  $ManagedVolumes += Get-RubrikManagedVolume -SLA $SLA  -PrimaryClusterID local
+}
+# #renew Rubrik connection in case snapshot took too long
+Connect-Rubrik -Server $rubrikNode -Credential (Import-Clixml $creds) | Out-Null
+foreach ($MV in $ManagedVolumes) {
+  write-host ("Taking snapshot of $($MV.name)...")
+  Start-RubrikManagedVolumeSnapshot -id $MV.id
+  Stop-RubrikManagedVolumeSnapshot -id $MV.id -SLA $targetSLADomain
 }
