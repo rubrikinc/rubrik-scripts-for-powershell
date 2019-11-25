@@ -70,14 +70,14 @@ param(
   [string]$targetSLADomain,
 
   # The credentials file for Rubrik
-  [Parameter(Mandatory = $false,
+  [Parameter(Mandatory = $True,
     HelpMessage = "Enter the Rubrik credentials file name.")]
-  [string]$creds = "c:\temp\rubrikcred.xml",
+  [string]$creds,
 
   # The IP address or hostname of a node in the Rubrik cluster.
-  [Parameter(Mandatory = $false,
+  [Parameter(Mandatory = $True,
     HelpMessage = "Enter the IP address or hostname of a node in the Rubrik Cluster.")]
-  [string]$rubrikNode = "amer1-rbk01"
+  [string]$rubrikNode
 )
 
 #Load Rubrik module and connect
