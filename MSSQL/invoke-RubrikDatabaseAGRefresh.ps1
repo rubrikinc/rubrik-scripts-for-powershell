@@ -2,9 +2,13 @@
 <#
 .SYNOPSIS
 Refresh Availability databases from a target server, for example DevRefresh
+For CDM 5.0 or lower will use AG AUTO SEED to seed database to secondary replica
+FOR CDM 5.1+ will seed the replicas exporting the databases
 
 .DESCRIPTION
 Based on parameters supplied, RubrikDatabaseAGRefresh will restore a databases from a Source (eg. Production) to a target server (eg. Developer)
+For CDM 5.0 or lower will use AG AUTO SEED to seed database to secondary replica
+FOR CDM 5.1+ will seed the replicas exporting the databases
 
 .PARAMETER databases
 It is a mandatory parameter, the script will export supplied DBs to the given target server. 
@@ -255,8 +259,7 @@ foreach($db in $databases) {
                     {
                         try{
                             Write-Verbose "Dropping database [$db] from node [$($Replica.rootName)]"
-                            $strSQL = "IF EXISTS(SELECT 1 FROM sys.databases 
-                                                  WHERE Name = '$db')
+                            $strSQL = "IF EXISTS(SELECT 1 FROM sys.databases WHERE Name = '$db')
                                         BEGIN
                                             DROP DATABASE $db
                                         END"
