@@ -3,8 +3,17 @@
 .SYNOPSIS
 Refresh Availability databases from a target server, for example DevRefresh
 
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! This script use the AUTOMATIC SEEDING AG feature to replicate the database to the Secondary Replicas!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 .DESCRIPTION
 Based on parameters supplied, RubrikDatabaseAGRefresh will restore a databases from a Source (eg. Production) to a target server (eg. Developer)
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!! This script use the AUTOMATIC SEEDING AG feature to replicate the database to the Secondary Replicas!!!
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 
 .PARAMETER databases
 It is a mandatory parameter, the script will export supplied DBs to the given target server. 
@@ -41,12 +50,12 @@ Refreshing a gorup of databases from Prod AG to DEV ag.
     $RubrikCredential = (Get-Credential -Message 'Please enter your Rubrik credentials')
     Connect-Rubrik -Server $RubrikServer -Credential $RubrikCredential
 
-    .\invoke-RubrikDatabaseAGRefresh.ps1 -databases "dbAG01","dbAG02","dbAG03" -SourceServerInstance "PROD_AG_name" -TargetServerInstance "DEV_AG_name" -LatestRecoveryPoint
+    .\invoke-RubrikDatabaseAGRefresh5.0.ps1 -databases "dbAG01","dbAG02","dbAG03" -SourceServerInstance "PROD_AG_name" -TargetServerInstance "DEV_AG_name" -LatestRecoveryPoint
         
 
 .NOTES
-Name:               AG database Refresh
-Created:            08/06/2019
+Name:               AG database Refresh using AUTO SEED
+Created:            11/26/2019
 Author:             Marcelo Fernandes
 Execution Process:
     Before running this script, you need to connect to the Rubrik cluster, and also ensure SQL Permission for account that will run this script.
@@ -250,36 +259,37 @@ foreach($db in $databases) {
                     FOREACH($Replica in $target | Sort-Object Role -Descending )
                     {
                         try{
+                            
                             Write-Verbose "Dropping database [$db] from node [$($Replica.rootName)]"
-                            $strSQL = "IF EXISTS(SELECT 1 FROM sys.databases 
-                                                  WHERE Name = '$db')
-                                        BEGIN
-                                            DROP DATABASE $db
-                                        END"
-                            try{
-                                Invoke-Sqlcmd -ServerInstance $("$($Replica.rootName)\$($Replica.instanceName)").Replace("\MSSQLSERVER","") -Database "master" -Query $strSQL -QueryTimeout 0
+
+                            $Query = "DROP DATABASE [" + $db + "]"
+                            try{                                
+                                Invoke-Sqlcmd -ServerInstance $("$($Replica.rootName)\$($Replica.instanceName)").Replace("\MSSQLSERVER","") -Database "master" -Query $Query -QueryTimeout 0
                                 Write-Verbose "Database [$db] deleted from replica [$($Replica.rootName)]"
                             }catch{$_}
-                            
+
                             Write-Verbose "Refreshing node [$($Replica.rootName)] at Rubrki Cluster"
                             Get-RubrikHost -Name $($Replica.rootName) | Update-RubrikHost | Out-Null
 
-                            Write-Verbose "Exporting database [$db] to node [$($Replica.rootName)] - AG [$TargetServerInstance]"
-                            $RubrikRequest = @()
-                            $RubrikRequest = Export-RubrikDatabase -Id $sourcedb.id `
-                                            -TargetInstanceId $replica.instanceId `
-                                            -TargetDatabaseName $sourcedb.name `
-                                            -recoveryDateTime $srcRecoveryDateTime `
-                                            -Overwrite `
-                                            -TargetFilePaths $sourcefiles `
-                                            -Confirm:$false
+                            if($Replica.role -eq "PRIMARY"){
+                                Write-Verbose "Exporting database [$db] to node [$($Replica.rootName)] - AG [$TargetServerInstance]"
+                                $RubrikRequest = @()
+                                $RubrikRequest = Export-RubrikDatabase -Id $sourcedb.id `
+                                                -TargetInstanceId $replica.instanceId `
+                                                -TargetDatabaseName $sourcedb.name `
+                                                -recoveryDateTime $srcRecoveryDateTime `
+                                                -Overwrite `
+                                                -FinishRecovery `
+                                                -TargetFilePaths $sourcefiles `
+                                                -Confirm:$false
                                     
-                            $Replica.RubrikRequest = $RubrikRequest
-
+                                $Replica.RubrikRequest = $RubrikRequest
+                            }
                         }catch{$_}
                     }
-                    #wait for Export completion for all nodes
-                    foreach($Replica in $target | Sort-Object Role )
+                    #wait for Export completion for all nodes 
+                    $Replica = @()
+                    foreach($Replica in $target | Where-Object role -eq "Primary")
                     {
                         Write-Verbose "Checking export progress for $($Replica.rootName)"
                         $ResultExport = Get-RubrikRequestInfo -RubrikRequest $Replica.RubrikRequest
@@ -288,19 +298,21 @@ foreach($db in $databases) {
                             Write-Host $ResultExport.error.message
                             return;
                         }else{Write-Verbose "Export completed successfully for $($Replica.rootName)"}
-                    }
 
-                    #Adding database back to AG
-                    $Replica = @()
-                    foreach($Replica in $target | Where-Object role -eq "Primary")
-                    {
-                        Write-Verbose "Setting $($DB) to RECOVERY on $($Replica.rootName)\$($Replica.instanceName)"
-                        $Query = "RESTORE DATABASE [$db] WITH RECOVERY;"                                
-                        Invoke-Sqlcmd -ServerInstance $("$($Replica.rootName)\$($Replica.instanceName)").Replace("\MSSQLSERVER","") -Database "master" -Query $Query
-                        
-                        Write-Verbose "Adding $($DB) to $($TargetServerInstance) on $($Replica.rootName)\$($Replica.instanceName)"
+                        #Adding database back to AG
+                        Write-Verbose "Adding $($DB) to $($TargetServerInstance) on $($Replica.rootName)\$($Replica.instanceName) using the SEEDING AUTOMATIC"
                         try{
-                            Add-SqlAvailabilityDatabase -Path "SQLSERVER:\Sql\$($Replica.rootName)\$($Replica.instanceName.replace("MSSQLSERVER","DEFAULT"))\AvailabilityGroups\$($TargetServerInstance)" -Database $db                            
+                            #checking teh seeding mode
+                            $Query = "SELECT seeding_mode_desc FROM master.sys.availability_replicas WHERE replica_server_name = '$($Replica.rootName)'"
+                            $seeding_mode = Invoke-Sqlcmd -ServerInstance $("$($Replica.rootName)\$($Replica.instanceName)").Replace("\MSSQLSERVER","") -Database "master" -Query $Query -QueryTimeout 0
+                            if ($seeding_mode -ne "AUTOMATIC"){
+                                #change AG to Automatic on Primary replica
+                                $Query = "ALTER AVAILABILITY GROUP [$($TargetServerInstance)] MODIFY REPLICA ON N'$($Replica.rootName)' WITH (SEEDING_MODE = AUTOMATIC)"
+                                Invoke-Sqlcmd -ServerInstance $("$($Replica.rootName)\$($Replica.instanceName)").Replace("\MSSQLSERVER","") -Database "master" -Query $Query -QueryTimeout 0
+                            }
+                            #change AG to Automatic on Primary replica
+                            $Query = "ALTER AVAILABILITY GROUP [$($TargetServerInstance)] ADD DATABASE [$db];"
+                            Invoke-Sqlcmd -ServerInstance $("$($Replica.rootName)\$($Replica.instanceName)").Replace("\MSSQLSERVER","") -Database "master" -Query $Query -QueryTimeout 0                            
                         }catch{$_}
                     }
 
