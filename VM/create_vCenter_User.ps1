@@ -32,7 +32,7 @@ $Rubrik_Role = "Rubrik_Backup_Service"
 #Privileges to assign to role
 #See the Rubrik Administrators Guide for Required Permissions
 $Rubrik_Privileges = @(
-Cryptographer.Access'
+  'Cryptographer.Access'
   'Datastore.AllocateSpace'
   'Datastore.Browse'
   'Datastore.Config'
