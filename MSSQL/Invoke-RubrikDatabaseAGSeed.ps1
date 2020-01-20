@@ -116,8 +116,15 @@ Connect-Rubrik -Server $RubrikServer -Credential $RubrikCredential
 
 #Get information about the database we will add to an availaility group
 Write-Debug "Getting information about $DatabaseName from $RubrikServer"
-$RubrikDatabase = Get-RubrikDatabase -Name $DatabaseName -Hostname $SQLServerHost -Instance $SQLServerInstance
+$RubrikDatabase = Get-RubrikDatabase -Name $DatabaseName -Hostname $SQLServerHost -Instance $SQLServerInstance | Get-RubrikDatabase
 $SourceSQLInstance = Get-RubrikSQLInstance -Hostname $SQLServerHost -Name $SQLServerInstance  
+
+#Checking if the database has at least 1 full backup (snapshot)
+if ([bool]($RubrikDatabase.latestRecoveryPoint) -eq $false)
+{
+    Write-Error "There are no full backup (snapshot) for $SQLServerHost\$SQLServerInstance\$DatabaseName, you have to start a full backup on Primary node before adding to an AG."
+    break
+}
 
 #Go to the primary replica and get the other replica servers
 $ServerInstance = $SQLServerHost
@@ -197,7 +204,7 @@ foreach ($Replica in $Replicas)
         else 
         {
             $TargetFilePaths = Get-RubrikDatabaseFiles -Id $RubrikDatabase.id `
-                -RecoveryDateTime (Get-RubrikDatabase -id $RubrikDatabase.ID).latestRecoveryPoint | Select-Object LogicalName,@{n='exportPath';e={$_.OriginalPath}},@{n='newFilename';e={$_.OriginalName}} 
+                -RecoveryDateTime $RubrikDatabase.latestRecoveryPoint | Select-Object LogicalName,@{n='exportPath';e={$_.OriginalPath}},@{n='newFilename';e={$_.OriginalName}} 
 
             Write-Debug "Setting up log shipping between $ServerInstance and $($Replica.replica_server_name)"
             $RubrikRequest = New-RubrikLogShipping -id $RubrikDatabase.id `
@@ -224,10 +231,19 @@ foreach($Replica in $ReplicasinAG | Where-Object Primary -eq $false)
     Get-RubrikRequestInfo -RubrikRequest $Replica.RubrikRequest
 }
 #Add all replicas to the availability group and then remove log shipping. 
-foreach($Replica in $ReplicasinAG | Sort-Object Primary -Descending)
-{   
-    Write-Debug "Adding $($DatabaseName) to $($AGName) on $($Replica.HostName)\$($Replica.Instance)"
-    Add-SqlAvailabilityDatabase -Path "SQLSERVER:\SQL\$($Replica.HostName)\$($Replica.Instance)\AvailabilityGroups\$($AGName)" -Database $DatabaseName        
+$AutSeed = $empty
+foreach($Replica in $ReplicasinAG | Sort-Object Primary -Descending )
+{
+    #checking if AUTO SEED is ON for Primary Replica
+    if ([bool]($Replica.Primary) -eq $true){
+        $Query = "SELECT seeding_mode_desc FROM sys.availability_groups ag JOIN sys.availability_replicas r ON ag.group_id = r.group_id WHERE name = '$AGName' AND replica_server_name = '$($Replica.HostName)'"
+        $AutSeed = Invoke-Sqlcmd -ServerInstance $ServerInstance -Query $Query 
+    }
+    #if AUTO SEED is ON, join DB only at Primary node, otherwhise will run ADD command for Secodary replica as well.
+    if (([bool]($Replica.Primary) -eq $true) -or $AutSeed.seeding_mode_desc -eq "MANUAL"){
+        Write-Debug "Adding $($DatabaseName) to $($AGName) on $($Replica.HostName)\$($Replica.Instance)"
+        Add-SqlAvailabilityDatabase -Path "SQLSERVER:\SQL\$($Replica.HostName)\$($Replica.Instance)\AvailabilityGroups\$($AGName)" -Database $DatabaseName        
+    }
 }
 Write-Debug "Removing Log Shipping for $DatabaseName"
 Get-RubrikLogShipping -PrimaryDatabaseName $DatabaseName -SecondaryDatabaseName $DatabaseName | Remove-RubrikLogShipping
