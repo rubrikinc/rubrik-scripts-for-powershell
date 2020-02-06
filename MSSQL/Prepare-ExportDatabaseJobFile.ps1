@@ -23,7 +23,7 @@
     A time  to which the database should be restored to. There are a few different possibilities
         latest:             This will tell Rubrik to export the database to the latest recovery point Rubrik knows about
                             This will include the last full and any logs to get to the latest recovery point
-        last full:          This will tell Rubrik to restore back to the last full backup it has
+        lastfull:           This will tell Rubrik to restore back to the last full backup it has
         Format:             (HH:MM:SS.mmm) or (HH:MM:SS.mmmZ) - Restores the database back to the local or 
                             UTC time (respectively) at the point in time specified within the last 24 hours
         Format:             Any valid <value> that PS Get-Date supports in: "Get-Date -Date <Value>"
@@ -178,7 +178,29 @@ foreach($Database in $Databases){
         }
     
         $TargetFiles = @()
-        $DatabaseRecoveryPoint = Get-DatabaseRecoveryPoint -RubrikDatabase $RubrikDatabase -RestoreTime $RecoveryPoint
+        switch ($RecoveryPoint) {
+            "Latest" {
+                $GetRubrikDatabaseRecoveryPoint = @{
+                    id = $RubrikDatabase.id
+                    Latest = $true
+                }
+            }
+            "LastFull" {
+                $GetRubrikDatabaseRecoveryPoint = @{
+                    id = $RubrikDatabase.id
+                    LastFull = $true
+                }
+            }
+            Default {
+                $GetRubrikDatabaseRecoveryPoint = @{
+                    id = $RubrikDatabase.id
+                    RestoreTime = $RecoveryPoint
+                }
+            }
+        }
+        
+        # $DatabaseRecoveryPoint = Get-RubrikDatabaseRecoveryPoint -RubrikDatabase $RubrikDatabase -RestoreTime $RecoveryPoint
+        $DatabaseRecoveryPoint = Get-RubrikDatabaseRecoveryPoint @GetRubrikDatabaseRecoveryPoint
         $RubrikDatabaseFiles = Get-RubrikDatabaseFiles -Id $RubrikDatabase.id -RecoveryDateTime $DatabaseRecoveryPoint
 
         foreach ($RubrikDatabaseFile in $RubrikDatabaseFiles){
@@ -210,7 +232,7 @@ foreach($Database in $Databases){
                 Instance        = $TargetSQLInstance
                 instanceId      = $TargetRubrikSQLInstance.id
                 SQLHost         = $TargetSQLHost
-                RecoveryPoint   = $DatabaseRecoveryPoint.GetDateTimeFormats()[102]
+                RecoveryPoint   = $DatabaseRecoveryPoint
                 Files           = $TargetFiles
             }
         }
