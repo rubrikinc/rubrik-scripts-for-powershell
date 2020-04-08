@@ -1,5 +1,5 @@
 function Get-RubrikRecentOnDemandSnapshot {
-  <#
+<#
 .SYNOPSIS
 Retrieve the events related to on-demand snapshots
 
@@ -26,6 +26,7 @@ Get-RubrikRecentOnDemandSnapshot -Days 7
 
 Retrieve the on-demand snapshots for the last 7 days
 #>
+
     param(
         # Specify the amount of days on-demand backups should be retrieved for
         [decimal] $Days = 1
@@ -45,5 +46,3 @@ Retrieve the on-demand snapshots for the last 7 days
         $_.eventInfo -match 'started a job to create an on-demand'
     } | Select-Object -Property Date,EventInfo
 }
-
-
