@@ -1,3 +1,38 @@
+<#
+.SYNOPSIS
+    Script will fail over a database involve with log shipping to the secondary side and then reverse the log shipping process from the new primary to the new secondary
+.DESCRIPTION
+    Script will fail over a database involve with log shipping to the secondary side and then reverse the log shipping process from the new primary to the new secondary
+.EXAMPLE
+    PS C:\> .\Invoke-LogShippingFailover.ps1 -RubrikServer 172.1.1.1 -SourceSQLServerInstance sql1\instancename -TargetSQLServerInstance sql2\instancename -Databases Adventureworks
+    Will bring Adventureworks online on SQL2\InstanceName, take Adventureworks offline on SQL1\InstanceName and then reverse the log shipping process from SQL2 to SQL1
+.PARAMETER RubrikServer
+    Rubrik Server should be the IP Address or your Rubrik Server Name. This will be the same value you use to access the Rubrik UI
+.PARAMETER SourceSQLServerInstance
+    Source SQL Host is the name of the SQL Server Host. 
+    If an SQL FCI, then this will be the Virtual Name given to SQL Server
+    If an Availability Group, then this should be the availability group name
+.PARAMETER TargetSQLServerInstance
+    This is the name of the SQL Server Instance. 
+    If referrencing a Default instance, then this should be MSSQLSERVER
+    If referrencing a Named instance, then this should be the instance name
+    This is defaulted to MSSQLSERVER if no value is provided. 
+.PARAMETER Databases
+    Provide a comma separated list of databases found on the source SQL Server and Instance
+.PARAMETER RubrikCredentialFile
+    File that will contain encrypted credentials to log into to RUbrik with. To create that file use the statements
+        $Credential = Get-Credential
+        $Credential | Export-CliXml -Path .\rubrik.Cred
+.PARAMETER Token
+    API Token from Rubrik. You can generate this inside of the Rurbik UI
+
+.NOTES
+    Name:       Invoke Log Shipping Failover
+    Created:    4/10/2020
+    Author:     Chris Lumnah
+
+#>
+[cmdletbinding()]
 #requires -modules Rubrik, SQLServer
 [CmdletBinding()]
 param (
