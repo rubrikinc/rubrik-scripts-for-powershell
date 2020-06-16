@@ -33,7 +33,7 @@ if($unmount_reqs) {Wait-RubrikRequests $unmount_reqs}
 
 "Begining mount process for: $($databases -join ",")" | Out-Host
 $mount_reqs = Get-RubrikDatabase -Hostname $source.hostname -Instance $source.instance |
-    Where-Object {$databases -contains $_.Name} | 
+    Where-Object {$databases -contains $_.Name -and $_.isRelic -ne 'True'} | 
     ForEach-Object{$date = Get-RubrikSnapshot -id $_.id -Date (Get-Date); New-RubrikDatabaseMount -TargetInstanceId $TargetInstance.id -MountedDatabaseName "$($_.name)_LM" -RecoveryDateTime $date.date -id $_.id -confirm:$false}
 
 if($mount_reqs) {Wait-RubrikRequests $mount_reqs}
