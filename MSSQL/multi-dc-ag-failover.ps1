@@ -6,14 +6,8 @@
     to support cross data center failover. This script assumes that all the databases in the AG
     are inheriting from the AG and no databases are directly assigned.
 .EXAMPLE
-    #Enable Protection
-    PS C:\> .\multi-dc-ag-failover.ps1 -agname YourAvailabilityGroup -SLAName "SQL SLA" -LogBackupFrequencyMin 15 -LogBackupRetentionDay 14
-.EXAMPLE
-    #Disable Protection
-    PS C:\> .\multi-dc-ag-failover.ps1 -agname YourAvailabilityGroup -Disable
-.EXAMPLE
-    #Enable Protection and execute a snapshot
-    PS C:\> .\multi-dc-ag-failover.ps1 -agname YourAvailabilityGroup -SLAName "SQL SLA" -LogBackupFrequencyMin 15 -LogBackupRetentionDay 14 -NewSnapshot
+    .\multi-dc-ag-failover -AGname YourAG -PrimaryRubrikCluster cluster1.yourdomain.com -PrimaryRubrikToken '0000-0000-0000-0000-0000' -SecondaryRubrikCluster cluster2.yourdomain.com -SecondaryRubrikToekn '0000-0000-0000-0000-0000'
+        -SLAName 'YourSLA' -LogBackupFrequencyMin 15 -LogBackupRetentionDays 14
 
 
 #>
@@ -52,7 +46,7 @@ param(#Availability Group Name
 
       #Log backup retention in days
       [Alias("LogBackupRetention")]
-      [int]$LogBackupRetentionDay,
+      [int]$LogBackupRetentionDays,
 
       #Trigger new snapshot when enabling protection
       [Switch]$NewSnapshot
@@ -77,7 +71,7 @@ if($SecondaryRubrikToken.Length -gt 0){
 }
 #Enable protection on primary Rubrik cluster
 $primaryag = Get-RubrikAvailabilityGroup -GroupName $agname
-Set-RubrikAvailabilityGroup -id $primaryag.id -SLA $SLAName -LogBackupFrequencyInSeconds ($LogBackupFrequencyMin * 60) -LogRetentionHours ($LogBackupRetentionDay * 24) -Confirm:$false
+Set-RubrikAvailabilityGroup -id $primaryag.id -SLA $SLAName -LogBackupFrequencyInSeconds ($LogBackupFrequencyMin * 60) -LogRetentionHours ($LogBackupRetentionDays * 24) -Confirm:$false
 
 #if NewSnapshot is flagged, execute a new on-demand snapshot once protection is re-enabled
 if($snapshot -eq $true){
