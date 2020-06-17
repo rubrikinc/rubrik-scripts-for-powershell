@@ -50,7 +50,7 @@ param(#Availability Group Name
       )
 
 function New-RubrikConnection{
-    param($server,$cred,$token)
+    param($server,[securestring]$cred,$token)
     switch($true){
         {$cred} {
             $return = @{
@@ -66,7 +66,7 @@ function New-RubrikConnection{
         }
         default {
             $return = @{
-                Server = $RubrikServer
+                Server = $server
             }
         }
     }
