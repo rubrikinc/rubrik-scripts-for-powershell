@@ -4,7 +4,7 @@ function Get-SQLDatabaseDefaultLocations{
         [Parameter(Mandatory=$true)]
         [string]$Server
     )
-    Import-Module sqlserver  
+
     $SMOServer = new-object ('Microsoft.SqlServer.Management.Smo.Server') $Server 
 
     # Get the Default File Locations 
