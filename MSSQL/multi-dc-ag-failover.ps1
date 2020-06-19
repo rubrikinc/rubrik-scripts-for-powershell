@@ -50,7 +50,7 @@ param(#Availability Group Name
       )
 
 function New-RubrikConnection{
-    param($server,[securestring]$cred,$token)
+    param($server,[pscredential]$cred,$token)
     switch($true){
         {$cred} {
             $return = @{
@@ -74,19 +74,23 @@ function New-RubrikConnection{
 }
 #connect to the cluster that will be the secondary
 $connection = New-RubrikConnection -server $SecondaryRubrikCluster -cred $SecondaryRubriCredential -token $SecondaryRubrikToken
-Connect-Rubrik @connection
+Connect-Rubrik @connection | Out-Null
+$secondarycluster = Get-RubrikClusterInfo
 #gather AG
-$secondaryag = Get-RubrikAvailabilityGroup -GroupName $agname
-Set-RubrikAvailabilityGroup -id $secondaryag.id -SLA UNPROTECTED -LogBackupFrequencyInSeconds 0 -LogRetentionHours 0 -Confirm:$false
+$secondaryag = Get-RubrikAvailabilityGroup -GroupName $agname | Where-Object primaryClusterId -eq  $secondarycluster.id
+$secondaryconfig = [PSCustomObject]@{'logBackupFrequencyInSeconds'=0;'logRetentionHours'=0;'configuredSlaDomainId'='UNPROTECTED'}
+Invoke-RubrikRESTCall -Endpoint "mssql/availability_group/$($secondaryag.id)" -Method PATCH -api 'internal' -Body $secondaryconfig
 
 #connect to the cluster that will be the primary
 $connection = New-RubrikConnection -server $PrimaryRubrikCluster -cred $PrimaryRubriCredential -token $PrimaryRubrikToken
-Connect-Rubrik @connection
+Connect-Rubrik @connection | Out-Null
+$primarycluster = Get-RubrikClusterInfo 
 
 #Enable protection on primary Rubrik cluster
-$primaryag = Get-RubrikAvailabilityGroup -GroupName $agname
-Set-RubrikAvailabilityGroup -id $primaryag.id -SLA $SLAName -LogBackupFrequencyInSeconds ($LogBackupFrequencyMin * 60) -LogRetentionHours ($LogBackupRetentionDays * 24) -Confirm:$false
-
+$primaryag = Get-RubrikAvailabilityGroup -GroupName $agname | Where-Object primaryClusterId -eq $primarycluster.id
+$slaid = (Get-RubrikSLA -Name $SLAName -PrimaryClusterID local).id
+$primaryconfig = [PSCustomObject]@{'logBackupFrequencyInSeconds'=($LogBackupFrequencyMin * 60);'logRetentionHours'=($LogBackupRetentionDays * 24) ;'configuredSlaDomainId'=$slaid}
+Invoke-RubrikRESTCall -Endpoint "mssql/availability_group/$($primaryag.id)" -Method PATCH -api 'internal' -Body $primaryconfig 
 #if NewSnapshot is flagged, execute a new on-demand snapshot once protection is re-enabled
 if($snapshot -eq $true){
     Get-RubrikDatabase -AvailabilityGroupName $agname | Where-Object isRelic -ne 'TRUE' | New-RubrikSnapshot -SLA $SLAName -Confirm:$false
