@@ -14,23 +14,16 @@
 #>
 
 param(#Availability Group Name
-      [Parameter(ParameterSetName='Core')]
       [string]$agname,
 
       #Primary Rubrik connection info (cluster, user, password/token)
-      [Parameter(ParameterSetName='Core')]
       [string]$PrimaryRubrikCluster,
-      [Parameter(ParameterSetName='Core')]
       [pscredential]$PrimaryRubriCredential,
-      [Parameter(ParameterSetName='Core')]
       [string]$PrimaryRubrikToken,
 
       #Secondary Rubrik connection info (cluster, user, password/token)
-      [Parameter(ParameterSetName='Core')]
       [string]$SecondaryRubrikCluster,
-      [Parameter(ParameterSetName='Core')]
       [pscredential]$SecondaryRubriCredential,
-      [Parameter(ParameterSetName='Core')]
       [string]$SecondaryRubrikToken,
 
       #SLA Domain to be assigned
