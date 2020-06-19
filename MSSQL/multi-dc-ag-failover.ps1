@@ -6,9 +6,20 @@
     to support cross data center failover. This script assumes that all the databases in the AG
     are inheriting from the AG and no databases are directly assigned. It also assumes that the
     SLA domain name is the same for both sides of the AG.
+
+    The script assumes that the SQL portion of the failover will be executed outside of the
+    script. To use the script, you will declare:
+        -The name of the Availability Group that is failing over.
+        -A Primary Rubrik cluster where protection will be enabled.
+        -A Secondary Rubrik cluster where protection will be disabled.
+        -Log backup frequency and retention for the Availability Group.
+        -Whether or not a new snapshot should be taken once the failover is complete.
+        -A credential or a token for each Rubrik cluster to authenticate the access.
+
+
 .EXAMPLE
-    .\multi-dc-ag-failover -AGname YourAG -PrimaryRubrikCluster cluster1.yourdomain.com -PrimaryRubrikToken '0000-0000-0000-0000-0000' -SecondaryRubrikCluster cluster2.yourdomain.com -SecondaryRubrikToekn '0000-0000-0000-0000-0000'
-        -SLAName 'YourSLA' -LogBackupFrequencyMin 15 -LogBackupRetentionDays 14
+    .\multi-dc-ag-failover.ps1 -agname YourAGName -PrimaryRubrikCluster RubrikCluster1 -PrimaryRubriCredential $cred -SecondaryRubrikCluster RubrikCluster1 
+        -SecondaryRubriCredential $cred -SLAName 'YourSLADomain' -LogBackupFrequencyMin 60 -LogBackupRetentionDays 3 -NewSnapshot  
 
 
 #>
@@ -85,7 +96,7 @@ $slaid = (Get-RubrikSLA -Name $SLAName -PrimaryClusterID local).id
 $primaryconfig = [PSCustomObject]@{'logBackupFrequencyInSeconds'=($LogBackupFrequencyMin * 60);'logRetentionHours'=($LogBackupRetentionDays * 24) ;'configuredSlaDomainId'=$slaid}
 Invoke-RubrikRESTCall -Endpoint "mssql/availability_group/$($primaryag.id)" -Method PATCH -api 'internal' -Body $primaryconfig 
 #if NewSnapshot is flagged, execute a new on-demand snapshot once protection is re-enabled
-if($snapshot -eq $true){
+if($NewSnapshot){
     Get-RubrikDatabase -AvailabilityGroupName $agname | Where-Object isRelic -ne 'TRUE' | New-RubrikSnapshot -SLA $SLAName -Confirm:$false
 }
 
