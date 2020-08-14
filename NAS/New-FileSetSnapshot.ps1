@@ -40,16 +40,16 @@
 #>
 param
 (
-    [Parameter(Mandatory=$false,HelpMessage="IP address or DNS name to Rubrik Cluster")]
+    [Parameter(Mandatory=$true,HelpMessage="IP address or DNS name to Rubrik Cluster")]
     [string]$RubrikServer,
 
-    [Parameter(Mandatory=$false,HelpMessage="Name of the Fileset created in Rubrik")]
+    [Parameter(Mandatory=$true,HelpMessage="Name of the Fileset created in Rubrik")]
     [string]$FileSetName,
 
-    [Parameter(Mandatory=$false,HelpMessage="Name of the server that will be backed up")]
+    [Parameter(Mandatory=$true,HelpMessage="Name of the server that will be backed up")]
     [string]$HostName,
 
-    [Parameter(Mandatory=$false,HelpMessage="Name of the SLA Domain")]
+    [Parameter(Mandatory=$true,HelpMessage="Name of the SLA Domain")]
     [string]$SLADomain,
 
     [Parameter(ParameterSetName = 'CredentialFile',HelpMessage="Path and filename of encrypted credential file")]
@@ -57,7 +57,7 @@ param
     [Parameter(ParameterSetName = 'Token')]
     [string]$Token
 )
-$Token = $Rubrik.token.emea1
+
 Import-Module Rubrik
 switch($true){
     {$RubrikCredentialFile} {$RubrikCredential = Import-CliXml -Path $RubrikCredentialFile
