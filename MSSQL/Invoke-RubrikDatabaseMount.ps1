@@ -89,7 +89,7 @@ Get-ChildItem -Path $Path -Filter *.ps1 |Where-Object { $_.FullName -ne $PSComma
 #endregion
 #region Required Modules for Script to run
 # Requires -Modules Rubrik, SQLServer, FailoverClusters
-Import-Module C:\Users\chris.lumnah\OneDrive\Documents\repos\rubrik-sdk-for-powershell\Rubrik\Rubrik.psd1 -force
+# Import-Module C:\Users\chris.lumnah\OneDrive\Documents\repos\rubrik-sdk-for-powershell\Rubrik\Rubrik.psd1 -force
 Import-Module SQLServer
 Import-Module FailoverClusters -SkipEditionCheck
 #endregion
