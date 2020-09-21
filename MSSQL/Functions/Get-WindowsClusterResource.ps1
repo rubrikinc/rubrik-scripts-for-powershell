@@ -3,9 +3,6 @@ function Get-WindowsClusterResource{
         [String]$ServerInstance,
         [String]$Instance
     )
-    Import-Module FailoverClusters
-    Import-Module SqlServer
-
     $InvokeSQLCMD = @{
         Query = "SELECT [NodeName] FROM [master].[sys].[dm_os_cluster_nodes] WHERE is_current_owner = 1"
         ServerInstance = $ServerInstance
