@@ -1,14 +1,10 @@
-
 <#
 .SYNOPSIS
 Creates and Polls Rubrik Reports to build a custom HTML Report
-
 .DESCRIPTION
 Takes either a defined list of hosts and outputs a custom HTML report or runs against all hosts
-
 .EXAMPLE
 .\Get-Protection-Events.ps1
-
 .NOTES
     Name:               Get Protection Events
     Created:            9/30/2019
@@ -19,8 +15,9 @@ Import-Module Rubrik
 #### User Defined Variables ####
 $cluster_ip = 'notacluster.rubrik.com' #Rubrik Cluster
 $report_name = 'Protection-Tasks-Detailed' #Rubrik Report Name to generate HTML Report from
-$RubrikUser = "notauser@rubrik.com" #Rubrik Username - Suggested using read-only user account
+$RubrikUser = "notauser" #Rubrik Username - Suggested using read-only user account
 $rubrik_pass = "notapassword" #Rubrik Password - Suggested using read-only user account
+$rubrikPW = ConvertTo-SecureString $rubrik_pass -asplaintext -force
 $output_folder = '.' #Use local path to output HTML Report To
 $output_file_name = $output_folder + "\" + $(get-date -uFormat "%Y%m%d-%H%M%S") + "-RubrikReport.html" #Name of HTML Report
 
@@ -31,76 +28,9 @@ $output_file_name = $output_folder + "\" + $(get-date -uFormat "%Y%m%d-%H%M%S") 
 #     'host2.domain.com',
 # )
 $serverList = @(
-    'em2-andrdrap-w1.rubrikdemo.com',
-    'em2-andrdrap-w1'
+    'ad-sw-2016',
+    'ad-ubu-proxy'
 )
-#### User Defined Variables ####
-$rubrikPW = ConvertTo-SecureString $rubrik_pass -asplaintext -force
-
-# Define function to get all information from the Report
-function Get-RubrikReportDataFull () {
-    [CmdletBinding()]
-    Param (
-        [string]$rubrik_ip,
-        [string]$rubrik_user,
-        [string]$rubrik_pass,
-        [string]$report_id,
-        [string]$object_type
-    )
-
-    $headers = @{
-        Authorization = "Basic {0}" -f [Convert]::ToBase64String([Text.Encoding]::ASCII.GetBytes(("{0}:{1}" -f $rubrik_user,$rubrik_pass)))
-        Accept = 'application/json'
-    }
-    if ($psversiontable.PSVersion.Major -le 5) {
-        try {
-            # This block prevents errors from self-signed certificates
-            Add-Type -TypeDefinition @"
-using System.Net;
-using System.Security.Cryptography.X509Certificates;
-public class TrustAllCertsPolicy : ICertificatePolicy {
-    public bool CheckValidationResult(
-        ServicePoint srvPoint, X509Certificate certificate,
-        WebRequest request, int certificateProblem) {
-        return true;
-    }
-}
-"@
-            [System.Net.ServicePointManager]::CertificatePolicy = New-Object -TypeName TrustAllCertsPolicy
-            [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-        }
-        catch {
-
-        }
-    }
-    $report_output = @()
-    $report_query = @{
-        limit = 9999
-    }
-
-    $has_more = $true
-    while ($has_more -eq $true) {
-        if ($null -ne $cursor) {
-            $report_query['cursor'] = $cursor
-        }
-        if ($psversiontable.PSVersion.Major -le 5) {
-            $report_response = Invoke-WebRequest -Uri $("https://"+$rubrik_ip+"/api/internal/report/"+$report_id+"/table") -Headers $headers -Method POST -Body $(ConvertTo-Json $report_query)
-        } else {
-            $report_response = Invoke-WebRequest -Uri $("https://"+$rubrik_ip+"/api/internal/report/"+$report_id+"/table") -Headers $headers -Method POST -Body $(ConvertTo-Json $report_query) -SkipCertificateCheck
-        }
-        $report_data = $report_response.Content | ConvertFrom-Json
-        $has_more = $report_data.hasMore
-        $cursor = $report_data.cursor
-        foreach ($report_entry in $report_data.dataGrid) {
-            $row = '' | Select-Object $report_data.columns
-            for ($i = 0; $i -lt $report_entry.count; $i++) {
-                $row.$($report_data.columns[$i]) = $($report_entry[$i])
-            }
-            $report_output += $row
-        }
-    }
-    return $report_output
-}
 
 # Set HTML Header
 $output_html = @()
@@ -111,7 +41,7 @@ H1 {font-family: Calibri, Helvetica, sans-serif;}
 H3 {font-family: Calibri, Helvetica, sans-serif;}
 TABLE {border-width: 1px; border-style: solid; border-color: black; border-collapse: collapse;}
 TH {border-width: 1px; position: sticky; padding: 3px; border-style: solid; border-color: black; background-color: #00cccc; font-family: Calibri, Helvetica, sans-serif;}
-TD {border-width: 1px; padding: 3px; border-style: solid; border-color: black; font-family: Calibri, Helvetica, sans-serif;}
+TD {border-width: 1px; padding: 3px; border-style: solid; border-color: black; font-family: Calibri, Helvetica, sans-serif; white-space: nowrap}
 </style></head>
 "@
 
@@ -120,20 +50,20 @@ $null = Connect-Rubrik -Server $cluster_ip -Username $RubrikUser -Password $rubr
 Write-Host 'Connected to Rubrik Cluster:'$global:rubrikConnection.server
 
 #Get Report ID by Report Name
-$reports = Invoke-RubrikRESTCall -Endpoint "report?name=$($report_name)" -api internal -Method GET
+$reports = Get-RubrikReport -Name $report_name
 
 # Deal with Multiple Report Results
-if($reports.total -gt 1){
+if($reports.count -ge 1){
 
     # Multiple Reports with same name
     foreach($reportName in $reports){
-        if($reports.data.name -eq $report_name){
+        if($reportName.name -eq $report_name){
             $report = $reportName
         }
     }
 
-# Create the report if it doesn't exist
-} elseif($reports.total -lt 1){
+# Create the report if it doesn't exist - TODO: Rework this to use powershell module
+} elseif($reports.count -lt 1){
     # Create Report
     $createReportPayload = @{
         "name" = "$($report_name)"
@@ -177,15 +107,15 @@ if($reports.total -gt 1){
     $report = Invoke-RubrikRESTCall -Endpoint "report/$($createReport.id)" -Method PATCH -api internal -Body $patchReportPayload
     do{
         $report = Invoke-RubrikRESTCall -Endpoint "report/$($createReport.id)" -api internal -Method GET
-        write-host "Generating $($report_name). This may take a few minutes. Current Status: $($createReport.updateStatus)"
+        write-host "Generating $($report_name). This may take a few minutes. Current Status: $($report.updateStatus)"
         start-sleep 10
     } while($report.updateStatus -ne 'Ready')
 
-    $report = Invoke-RubrikRESTCall -Endpoint "report/$($createReport.id)" -api internal -Method GET
+    $reports = Get-RubrikReport -Name $report_name
 }
 
 # Get the Table contents for the report
-$report_data = Get-RubrikReportDataFull -rubrik_ip $cluster_ip -rubrik_user $RubrikUser -rubrik_pass $rubrik_pass -report_id $report.id
+$report_data = Get-RubrikReportData -id $report.id
 
 # Create HTML File contents, with Report Header and Table Headers
 $output_html += $style_head
@@ -214,8 +144,17 @@ $output_html += "<th>Logical Data Protected (GB)</th>"
 $output_html += "<th>Job Status</th>"
 $output_html += "<th>Failure Reason</th>"
 
+$report_output = @()
+foreach ($report_entry in $report_data.dataGrid) {
+    $row = '' | Select-Object $report_data.columns
+    for ($i = 0; $i -lt $report_entry.count; $i++) {
+        $row.$($report_data.columns[$i]) = $($report_entry[$i])
+    }
+    $report_output += $row
+}
+
 # Loop through table data
-foreach($report_row in $report_data){
+foreach($report_row in $report_output){
 
     # Format report values
     $rubrikHostname = $report_row.Location.split('\')[0]
@@ -226,8 +165,7 @@ foreach($report_row in $report_data){
     # Remove Replication events
     if(($report_row.TaskType -ne 'Replication') -and ($report_row.TaskType -ne 'LogReplication')){
 
-        #Filter against hostnames
-        ### v -- disable this block to get all events
+        #region FilteredList v -- disable this block and enable all events
         if($report_row.ObjectType -eq 'VmwareVirtualMachine'){
             if($serverList -contains $report_row.ObjectName){
                 $output_html += "<tr>"
@@ -267,11 +205,9 @@ foreach($report_row in $report_data){
                 $output_html += "</tr>"
             }
         }
+        #endregion FilteredList ^ -- disable this block
 
-
-        ### ^ -- disable this block
-
-        ### v -- enable this block to get all events
+        #region AllEvents -- enable this block to get all events
         <#
         $output_html += "<tr>"
         $output_html += "<td>$($report_row.TaskType)</td>"
@@ -290,9 +226,8 @@ foreach($report_row in $report_data){
         $output_html += "<td>$($report_row.FailureReason)</td>"
         $output_html += "</tr>"
         #>
-        ### ^ -- enable this block
+        #endregion AllEvents ^ -- enable this block
     }
-
 }
 
 # Close and output HTML Report
@@ -301,9 +236,9 @@ $output_html > $output_file_name
 
 # Disconnect Session from Rubrik
 Write-Host 'Disconnecting from Rubrik'
-Disconnect-Rubrik -Confirm:$false
+$null = Disconnect-Rubrik -Confirm:$false
 
-write-host "Script completed, results in output file: $(output_file_name)"
+write-host "Script completed, results in output file: $($output_file_name)"
 
 # Use this block to email report out (requires a working SMTP server) (remove # at the start of the lines)
 #$SmtpServer = "stmp.demo.lab"
