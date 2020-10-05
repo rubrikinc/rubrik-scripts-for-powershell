@@ -53,17 +53,18 @@ Write-Host 'Connected to Rubrik Cluster:'$global:rubrikConnection.server
 $reports = Get-RubrikReport -Name $report_name
 
 # Deal with Multiple Report Results
-if($reports.count -ge 1){
+if($reports) {
 
     # Multiple Reports with same name
     foreach($reportName in $reports){
         if($reportName.name -eq $report_name){
             $report = $reportName
+            Write-Host "Report $($report.name) Found with ID: $($report.id)"
         }
     }
 
 # Create the report if it doesn't exist - TODO: Rework this to use powershell module
-} elseif($reports.count -lt 1){
+} else {
     # Create Report
     $createReportPayload = @{
         "name" = "$($report_name)"
