@@ -1,3 +1,6 @@
 {
-    "files.defaultLanguage": "Powershell"
+    "files.defaultLanguage": "Powershell",
+    "cSpell.words": [
+        "pscredential"
+    ]
 }
