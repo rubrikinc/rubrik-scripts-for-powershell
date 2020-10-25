@@ -97,7 +97,8 @@ $VMwareCreds = Import-CliXml -Path $VMwareCredentialFile
 Connect-VIServer $VCenter -Credential $VMwareCreds
 # $myDataCenter = Get-Datacenter -Name $VMwareDataCenter
 $myCluster = Get-Cluster -Name $VMwareCluster
-$myVMHost = Get-VMHost -Name $VCenter
+$myVMHosts = $myCluster | Get-VMHost
+$myVMHost = $myVMHosts | Select-Object -First 1
 $myDatastore = Get-Datastore -Name $DataStore
 $myVMFolder = Get-Folder -Name $VMFolder
 
