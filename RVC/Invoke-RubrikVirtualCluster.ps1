@@ -68,7 +68,7 @@ param
     [string] $OVAFile,
 
     [Parameter(Mandatory = $true, HelpMessage = "Credentials file for vCenter. ")]
-    [pscredential] $VMwareCreds,    
+    [pscredential] $VMwareCredentialFile,    
     
     [Parameter(Mandatory = $true, HelpMessage = "Hostname of the vCenter server. ")]
     [string] $VCenter,
@@ -93,6 +93,7 @@ param
 
 Import-Module VMware.VimAutomation.Core
 
+$VMwareCreds = Import-CliXml -Path $VMwareCredentialFile
 Connect-VIServer $VCenter -Credential $VMwareCreds
 # $myDataCenter = Get-Datacenter -Name $VMwareDataCenter
 $myCluster = Get-Cluster -Name $VMwareCluster
