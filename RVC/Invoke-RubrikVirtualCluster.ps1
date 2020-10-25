@@ -116,6 +116,8 @@ for ($myRVCNum = 1; $myRVCNum -le $NumRVCNodes; $myRVCNum++) {
     #     -InventoryLocation $myVMFolder `
     #     -Location $myCluster `
     #     -OvfConfiguration $ovfConfig
+    $myVMwareUsername = $VMwareCreds.UserName
+    $myVMwarePassword = $VMwareCreds.GetNetworkCredential().password
     ovftool --acceptAllEulas --powerOffTarget --noSSLVerify --allowExtraConfig `
         --diskMode=$DiskMode `
         --name=$myRVCName `
@@ -124,7 +126,7 @@ for ($myRVCNum = 1; $myRVCNum -le $NumRVCNodes; $myRVCNum++) {
         --net:"Management Network"="$ManagementNetwork" `
         --net:"Data Network"="$DataNetwork" `
         $OVAFile `
-        "vi://${VMwareCreds}.UserName:${VMwareCreds}.GetNetworkCredential().password@${VCenter}/${DataCenter}/host/${Cluster}"
+        "vi://${myVMwareUsername}:${myVMwarePassword}@${VCenter}/${DataCenter}/host/${Cluster}"
     $myVM = Get-VM $myRVCName
     for ($myRVCDiskNum = 1; $myRVCDiskNum -le $NumDataDisks; $myRVCDiskNum++) {
         $myVM | New-HardDisk -CapacityGB $DataDiskSize -StorageFormat $DataDiskType 
