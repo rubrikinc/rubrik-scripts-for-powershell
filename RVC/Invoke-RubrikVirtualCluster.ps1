@@ -115,7 +115,7 @@ for ($myRVCNum = 1; $myRVCNum -le $NumRVCNodes; $myRVCNum++) {
         -DiskStorageFormat $DiskMode `
         -InventoryLocation $myVMFolder `
         -Location $myCluster `
-        -OvfConfiguration = $ovfConfig
+        -OvfConfiguration $ovfConfig
     $myVM = Get-VM $myRVCName
     for ($myRVCDiskNum = 1; $myRVCDiskNum -le $NumDataDisks; $myRVCDiskNum++) {
         $myVM | New-HardDisk -CapacityGB $DataDiskSize -StorageFormat $DataDiskType 
