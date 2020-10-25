@@ -46,7 +46,7 @@ param
     [Parameter(Mandatory = $true, HelpMessage = "The VMware datastore on which RVC will be deployed.")]
     [string] $DataStore,
 
-    [Parameter(Mandatory = $true, HelpMessage = "The VMware VM folder in which RVC will be deployed.")] 
+    [Parameter(Mandatory = $true, HelpMessage = "The VMware Data Center where RVC will be deployed.")] 
     [string] $DataCenter,
 
     [Parameter(Mandatory = $true, HelpMessage = "The VMware VM folder in which RVC will be deployed.")] 
