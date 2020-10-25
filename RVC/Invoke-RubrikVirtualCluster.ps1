@@ -107,7 +107,7 @@ for ($myRVCNum = 1; $myRVCNum -le $NumRVCNodes; $myRVCNum++) {
     $ovfConfig = Get-OvfConfiguration $ovaFile
     $ovfConfig.NetworkMapping.Management_Network.Value = $ManagementNetwork
     $ovfConfig.NetworkMapping.Data_Network.Value = $DataNetwork
-    $myRVCName = "$(NodeNamePrefix)-$(myRVCNum)"
+    $myRVCName = "$NodeNamePrefix-$myRVCNum"
     Import-VApp -Source $OVAFile `
         -VMHost $myVMHost `
         -Name $myRVCName `
