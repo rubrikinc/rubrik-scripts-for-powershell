@@ -96,26 +96,35 @@ Import-Module VMware.VimAutomation.Core
 $VMwareCreds = Import-CliXml -Path $VMwareCredentialFile
 Connect-VIServer $VCenter -Credential $VMwareCreds
 # $myDataCenter = Get-Datacenter -Name $VMwareDataCenter
-$myCluster = Get-Cluster -Name $VMwareCluster
-$myVMHosts = $myCluster | Get-VMHost
-$myVMHost = $myVMHosts | Select-Object -First 1
-$myDatastore = Get-Datastore -Name $DataStore
-$myVMFolder = Get-Folder -Name $VMFolder
+# $myCluster = Get-Cluster -Name $VMwareCluster
+# $myVMHosts = $myCluster | Get-VMHost
+# $myVMHost = $myVMHosts | Select-Object -First 1
+# $myDatastore = Get-Datastore -Name $DataStore
+# $myVMFolder = Get-Folder -Name $VMFolder
 
 for ($myRVCNum = 1; $myRVCNum -le $NumRVCNodes; $myRVCNum++) {
 
-    $ovfConfig = Get-OvfConfiguration $ovaFile
-    $ovfConfig.NetworkMapping.Management_Network.Value = $ManagementNetwork
-    $ovfConfig.NetworkMapping.Data_Network.Value = $DataNetwork
     $myRVCName = "$NodeNamePrefix-$myRVCNum"
-    Import-VApp -Source $OVAFile `
-        -VMHost $myVMHost `
-        -Name $myRVCName `
-        -Datastore $myDatastore `
-        -DiskStorageFormat $DiskMode `
-        -InventoryLocation $myVMFolder `
-        -Location $myCluster `
-        -OvfConfiguration $ovfConfig
+    # $ovfConfig = Get-OvfConfiguration $ovaFile
+    # $ovfConfig.NetworkMapping.Management_Network.Value = $ManagementNetwork
+    # $ovfConfig.NetworkMapping.Data_Network.Value = $DataNetwork
+    # Import-VApp -Source $OVAFile `
+    #     -VMHost $myVMHost `
+    #     -Name $myRVCName `
+    #     -Datastore $myDatastore `
+    #     -DiskStorageFormat $DiskMode `
+    #     -InventoryLocation $myVMFolder `
+    #     -Location $myCluster `
+    #     -OvfConfiguration $ovfConfig
+    ovftool --acceptAllEulas --powerOffTarget --noSSLVerify --allowExtraConfig `
+        --diskMode=$DiskMode `
+        --name=$myRVCName `
+        --datastore=$DataStore `
+        --vmFolder="$VMFolder" `
+        --net:"Management Network"="$ManagementNetwork" `
+        --net:"Data Network"="$DataNetwork" `
+        $OVAFile `
+        "vi://${VMwareCreds.UserName}:${$VMwareCreds.GetNetworkCredential().password}@${VCenter}/${DataCenter}/host/${Cluster}"
     $myVM = Get-VM $myRVCName
     for ($myRVCDiskNum = 1; $myRVCDiskNum -le $NumDataDisks; $myRVCDiskNum++) {
         $myVM | New-HardDisk -CapacityGB $DataDiskSize -StorageFormat $DataDiskType 

@@ -1,6 +1,7 @@
 {
     "files.defaultLanguage": "Powershell",
     "cSpell.words": [
+        "ovftool",
         "pscredential"
     ]
 }
