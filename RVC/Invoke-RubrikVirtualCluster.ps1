@@ -68,7 +68,7 @@ param
     [string] $OVAFile,
 
     [Parameter(Mandatory = $true, HelpMessage = "Credentials file for vCenter. ")]
-    [pscredential] $VMwareCredentialFile,    
+    [string] $VMwareCredentialFile,    
     
     [Parameter(Mandatory = $true, HelpMessage = "Hostname of the vCenter server. ")]
     [string] $VCenter,
