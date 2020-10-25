@@ -47,6 +47,9 @@ param
     [string] $DataStore,
 
     [Parameter(Mandatory = $true, HelpMessage = "The VMware VM folder in which RVC will be deployed.")] 
+    [string] $DataCenter,
+
+    [Parameter(Mandatory = $true, HelpMessage = "The VMware VM folder in which RVC will be deployed.")] 
     [string] $VMFolder,
 
     [Parameter(Mandatory = $true, HelpMessage = "The Data Network to attach RVC to.")]
@@ -126,7 +129,7 @@ for ($myRVCNum = 1; $myRVCNum -le $NumRVCNodes; $myRVCNum++) {
         --net:"Management Network"="$ManagementNetwork" `
         --net:"Data Network"="$DataNetwork" `
         $OVAFile `
-        "vi://${myVMwareUsername}:${myVMwarePassword}@${VCenter}/${DataCenter}/host/${Cluster}"
+        "vi://${myVMwareUsername}:${myVMwarePassword}@${VCenter}/${DataCenter}/host/${VMwareCluster}"
     $myVM = Get-VM $myRVCName
     for ($myRVCDiskNum = 1; $myRVCDiskNum -le $NumDataDisks; $myRVCDiskNum++) {
         $myVM | New-HardDisk -CapacityGB $DataDiskSize -StorageFormat $DataDiskType 
