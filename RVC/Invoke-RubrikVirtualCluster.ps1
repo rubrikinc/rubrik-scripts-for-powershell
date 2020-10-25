@@ -39,65 +39,85 @@
 
 param
 (
-    [Parameter(Mandatory = $true, HelpMessage = "The disk mode with which RVC will be deployed.")]
+    [Parameter(Mandatory = $true, HelpMessage = "Size of RVC data disks to add.",
+        ParameterSetName = "Command Line")]
+    [string] $RVCDataDiskSize,
+
+    [Parameter(Mandatory = $true, HelpMessage = "RVC Data Disk Type to Add.",
+        ParameterSetName = "Command Line")]
     [ValidateSet("EagerZeroedThick", "Thick", "Thin")]
-    [string] $DiskMode = 'EagerZeroedThick',
+    [string] $RVCDataDiskType = 'EagerZeroedThick',
     
-    [Parameter(Mandatory = $true, HelpMessage = "The VMware datastore on which RVC will be deployed.")]
-    [string] $DataStore,
+    [Parameter(Mandatory = $true, HelpMessage = "The Data Network to attach RVC to.",
+        ParameterSetName = "Command Line")]
+    [string] $RVCDataNetwork,
 
-    [Parameter(Mandatory = $true, HelpMessage = "The VMware Data Center where RVC will be deployed.")] 
-    [string] $DataCenter,
+    [Parameter(Mandatory = $true, HelpMessage = "The Management Network to attach RVC to.",
+        ParameterSetName = "Command Line")] 
+    [string] $RVCManagementNetwork,
 
-    [Parameter(Mandatory = $true, HelpMessage = "The VMware VM folder in which RVC will be deployed.")] 
-    [string] $VMFolder,
+    [Parameter(Mandatory = $true, HelpMessage = "Name of the Rubrik Virtual Cluster. Nodes will be named by adding a dash and increasing number will be appended during deployment.",
+        ParameterSetName = "Command Line")]
+    [string] $RVCName,
 
-    [Parameter(Mandatory = $true, HelpMessage = "The Data Network to attach RVC to.")]
-    [string] $DataNetwork,
+    [Parameter(Mandatory = $true, HelpMessage = "Number of RVC Nodes to deploy.",
+        ParameterSetName = "Command Line")]
+    [int] $RVCNumNodes = 4,
+
+    [Parameter(Mandatory = $true, HelpMessage = "Number of data disks to add to each node.",
+        ParameterSetName = "Command Line")]
+    [int] $RVCNumDataDisks = 6,
+
+    [Parameter(Mandatory = $true, HelpMessage = "The disk mode with which RVC will be deployed.",
+        ParameterSetName = "Command Line")]
+    [ValidateSet("EagerZeroedThick", "Thick", "Thin")]
+    [string] $RVCOSDataDiskType = 'EagerZeroedThick',
     
-    [Parameter(Mandatory = $true, HelpMessage = "The Management Network to attach RVC to.")] 
-    [string] $ManagementNetwork,
-    
-    [Parameter(Mandatory = $true, HelpMessage = "The prefix to use for each of the node names. A dash and increasing number will be appended during deployment.")]
-    [string] $NodeNamePrefix,
+    [Parameter(Mandatory = $true, HelpMessage = "The OVA file to deploy RVC from.",
+        ParameterSetName = "Command Line")]
+    [string] $RVCOVAFile,
 
-    [Parameter(Mandatory = $true, HelpMessage = "The VMware data center in which to deploy RVC.")]
-    [string] $VMwareDataCenter,
-
-    [Parameter(Mandatory = $true, HelpMessage = "The VMware cluster in which to deploy RVC.")]
+    [Parameter(Mandatory = $true, HelpMessage = "The VMware cluster in which to deploy RVC.",
+        ParameterSetName = "Command Line")]
     [string] $VMwareCluster,
 
-    [Parameter(Mandatory = $true, HelpMessage = "The OVA file to deploy RVC from.")]
-    [string] $OVAFile,
-
-    [Parameter(Mandatory = $true, HelpMessage = "Credentials file for vCenter. ")]
+    [Parameter(Mandatory = $true, HelpMessage = "Credentials file for vCenter.",
+        ParameterSetName = "Command Line")]
     [string] $VMwareCredentialFile,    
     
-    [Parameter(Mandatory = $true, HelpMessage = "Hostname of the vCenter server. ")]
-    [string] $VCenter,
+    [Parameter(Mandatory = $true, HelpMessage = "The VMware data center in which to deploy RVC.",
+        ParameterSetName = "Command Line")]
+    [string] $VMwareDataCenter,
 
-    [Parameter(Mandatory = $true, HelpMessage = "Data Disk Type to Add.")]
-    [ValidateSet("EagerZeroedThick", "Thick", "Thin")]
-    [string] $DataDiskType = 'EagerZeroedThick',
+    [Parameter(Mandatory = $true, HelpMessage = "The VMware datastore on which RVC will be deployed.",
+        ParameterSetName = "Command Line")]
+    [string] $VMwareDataStore,
 
-    [Parameter(Mandatory = $true, HelpMessage = "Size of data disks to add.")]
-    [string] $DataDiskSize,
+    [Parameter(Mandatory = $true, HelpMessage = "Hostname of the vCenter server.",
+        ParameterSetName = "Command Line")]
+    [string] $VMwareVCenter,
+
+    [Parameter(Mandatory = $true, HelpMessage = "The VMware VM folder in which RVC will be deployed.",
+        ParameterSetName = "Command Line")] 
+    [string] $VMwareVMFolder,
     
-    [Parameter(Mandatory = $true, HelpMessage = "Number of data disks to add to each node.")]
-    [int] $NumDataDisks = 6,
-
-    [Parameter(Mandatory = $true, HelpMessage = "Number of RVC Nodes to deploy.")]
-    [int] $NumRVCNodes = 4,
+    [Parameter(Mandatory = $true, HelpMessage = "Configuration file with parameters.",
+        ParameterSetName = "Config File")]
+    [string] $ConfigFile,
 
     [Parameter(Mandatory = $false, HelpMessage = "Remove CPU Reservation.")]
     [switch] $RemoveCPUReservation = $false
 
 )
 
+if ($ConfigFile) {
+    . $ConfigFile
+}
+
 Import-Module VMware.VimAutomation.Core
 
 $VMwareCreds = Import-CliXml -Path $VMwareCredentialFile
-Connect-VIServer $VCenter -Credential $VMwareCreds
+Connect-VIServer $VMwareVCenter -Credential $VMwareCreds
 # $myDataCenter = Get-Datacenter -Name $VMwareDataCenter
 # $myCluster = Get-Cluster -Name $VMwareCluster
 # $myVMHosts = $myCluster | Get-VMHost
@@ -105,9 +125,9 @@ Connect-VIServer $VCenter -Credential $VMwareCreds
 # $myDatastore = Get-Datastore -Name $DataStore
 # $myVMFolder = Get-Folder -Name $VMFolder
 
-for ($myRVCNum = 1; $myRVCNum -le $NumRVCNodes; $myRVCNum++) {
+for ($myRVCNum = 1; $myRVCNum -le $RVCNumNodes; $myRVCNum++) {
 
-    $myRVCName = "$NodeNamePrefix-$myRVCNum"
+    $myRVCName = "$RVCName-$myRVCNum"
     # $ovfConfig = Get-OvfConfiguration $ovaFile
     # $ovfConfig.NetworkMapping.Management_Network.Value = $ManagementNetwork
     # $ovfConfig.NetworkMapping.Data_Network.Value = $DataNetwork
@@ -122,17 +142,17 @@ for ($myRVCNum = 1; $myRVCNum -le $NumRVCNodes; $myRVCNum++) {
     $myVMwareUsername = $VMwareCreds.UserName
     $myVMwarePassword = $VMwareCreds.GetNetworkCredential().password
     ovftool --acceptAllEulas --powerOffTarget --noSSLVerify --allowExtraConfig `
-        --diskMode=$DiskMode `
+        --diskMode=$RVCOSDiskType `
         --name=$myRVCName `
-        --datastore=$DataStore `
-        --vmFolder="$VMFolder" `
-        --net:"Management Network"="$ManagementNetwork" `
-        --net:"Data Network"="$DataNetwork" `
-        $OVAFile `
-        "vi://${myVMwareUsername}:${myVMwarePassword}@${VCenter}/${DataCenter}/host/${VMwareCluster}"
+        --datastore=$VMwareDataStore `
+        --vmFolder="$VMwareVMFolder" `
+        --net:"Management Network"="$RVCManagementNetwork" `
+        --net:"Data Network"="$RVCDataNetwork" `
+        $RVCOVAFile `
+        "vi://${myVMwareUsername}:${myVMwarePassword}@${VMwareVCenter}/${VMwareDataCenter}/host/${VMwareCluster}"
     $myVM = Get-VM $myRVCName
-    for ($myRVCDiskNum = 1; $myRVCDiskNum -le $NumDataDisks; $myRVCDiskNum++) {
-        $myVM | New-HardDisk -CapacityGB $DataDiskSize -StorageFormat $DataDiskType 
+    for ($myRVCDiskNum = 1; $myRVCDiskNum -le $RVCNumDataDisks; $myRVCDiskNum++) {
+        $myVM | New-HardDisk -CapacityGB $RVCDataDiskSize -StorageFormat $RVCDataDiskType 
     }
     switch ( $true ) {
         $RemoveCPUReservation {
@@ -141,3 +161,8 @@ for ($myRVCNum = 1; $myRVCNum -le $NumRVCNodes; $myRVCNum++) {
     }
     $myVM | Start-VM
 }
+
+# Bootstrap cluster
+# Set Cluster Location
+# Add vCenter
+# Register with Polaris
