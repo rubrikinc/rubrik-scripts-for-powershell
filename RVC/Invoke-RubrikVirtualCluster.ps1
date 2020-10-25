@@ -94,7 +94,6 @@ param
 Import-Module VMware.VimAutomation.Core
 
 $VMwareCreds = Import-CliXml -Path $VMwareCredentialFile
-Set-PowerCLIConfiguration -InvalidCertificateAction Ignore
 Connect-VIServer $VCenter -Credential $VMwareCreds
 # $myDataCenter = Get-Datacenter -Name $VMwareDataCenter
 $myCluster = Get-Cluster -Name $VMwareCluster
