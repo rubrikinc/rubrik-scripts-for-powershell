@@ -138,7 +138,7 @@ param
 
     [Parameter(Mandatory = $true, HelpMessage = "Credentials file for vCenter.",
         ParameterSetName = "Command Line")]
-    [string] $VMwareCredentialFile,    
+    [Security.SecureString] $VMwareCredentialFile,    
     
     [Parameter(Mandatory = $true, HelpMessage = "The VMware data center in which to deploy RVC.",
         ParameterSetName = "Command Line")]
@@ -180,34 +180,15 @@ if ((Get-Command "Connect-VIServer" -ErrorAction SilentlyContinue)) {
     Write-Host "Make sure that PowerCLI is installed."
     exit 1
 }
- 
 
 Import-Module VMware.VimAutomation.Core
 
 $VMwareCreds = Import-CliXml -Path $VMwareCredentialFile
 Connect-VIServer $VMwareVCenter -Credential $VMwareCreds
-# $myDataCenter = Get-Datacenter -Name $VMwareDataCenter
-# $myCluster = Get-Cluster -Name $VMwareCluster
-# $myVMHosts = $myCluster | Get-VMHost
-# $myVMHost = $myVMHosts | Select-Object -First 1
-# $myDatastore = Get-Datastore -Name $DataStore
-# $myVMFolder = Get-Folder -Name $VMFolder
 
-$node_config = @{}
 for ($myRVCNum = 1; $myRVCNum -le $RVCNumNodes; $myRVCNum++) {
 
     $myRVCName = "$RVCName-$myRVCNum"
-    # $ovfConfig = Get-OvfConfiguration $ovaFile
-    # $ovfConfig.NetworkMapping.Management_Network.Value = $ManagementNetwork
-    # $ovfConfig.NetworkMapping.Data_Network.Value = $DataNetwork
-    # Import-VApp -Source $OVAFile `
-    #     -VMHost $myVMHost `
-    #     -Name $myRVCName `
-    #     -Datastore $myDatastore `
-    #     -DiskStorageFormat $DiskMode `
-    #     -InventoryLocation $myVMFolder `
-    #     -Location $myCluster `
-    #     -OvfConfiguration $ovfConfig
     $myVMwareUsername = $VMwareCreds.UserName
     $myVMwarePassword = $VMwareCreds.GetNetworkCredential().password
     ovftool --acceptAllEulas --powerOffTarget --noSSLVerify --allowExtraConfig `
@@ -228,13 +209,4 @@ for ($myRVCNum = 1; $myRVCNum -le $RVCNumNodes; $myRVCNum++) {
             $myVM | Get-VMResourceConfiguration | Set-VMResourceConfiguration -CpuReservationMhz 0
         }
     }
-    # # Gather Bootstrap Info for node.
-    #     $myVM | Start-VM
-    #     $myNodeName = $myVM | select @{N = 'FQDN'; E = { $_.ExtensionData.Guest.IPStack[0].DnsConfig.HostName}
-    #     }
 }
-
-# Bootstrap cluster
-# Set Cluster Location
-# Add vCenter
-# Register with Polaris
