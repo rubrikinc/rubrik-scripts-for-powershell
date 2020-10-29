@@ -175,7 +175,7 @@ if ($null -eq (Get-Command "ovftool.exe" -ErrorAction SilentlyContinue) -And $nu
     exit 1
 }
 
-if ((Get-Command "Connect-VIServer" -ErrorAction SilentlyContinue)) { 
+if ($null -eq (Get-Command "Connect-VIServer" -ErrorAction SilentlyContinue)) { 
     Write-Host "Unable to find Connect-VIServer in your PATH"
     Write-Host "Make sure that PowerCLI is installed."
     exit 1
