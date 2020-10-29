@@ -138,7 +138,7 @@ param
 
     [Parameter(Mandatory = $true, HelpMessage = "Credentials file for vCenter.",
         ParameterSetName = "Command Line")]
-    [Security.SecureString] $VMwareCredentialFile,    
+    [String] $VMwareCredentialFile,    
     
     [Parameter(Mandatory = $true, HelpMessage = "The VMware data center in which to deploy RVC.",
         ParameterSetName = "Command Line")]
