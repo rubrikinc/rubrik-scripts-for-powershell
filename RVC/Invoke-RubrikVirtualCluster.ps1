@@ -209,4 +209,5 @@ for ($myRVCNum = 1; $myRVCNum -le $RVCNumNodes; $myRVCNum++) {
             $myVM | Get-VMResourceConfiguration | Set-VMResourceConfiguration -CpuReservationMhz 0
         }
     }
+    $myVM | Start-VM
 }
