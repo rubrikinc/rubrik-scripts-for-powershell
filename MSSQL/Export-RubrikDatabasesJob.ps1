@@ -142,7 +142,8 @@ foreach ($Database in $JobFile.Databases) {
     }
  
     Write-Host "Restoring $($ExportRubrikDatabase.TargetDatabaseName) to $($ExportRubrikDatabase.recoveryDateTime) onto $($GetRubrikSQLInstance.HostName)\$($GetRubrikSQLInstance.Name)"
-    $RubrikRequest = Export-RubrikDatabase @ExportRubrikDatabase -Verbose
+    $RubrikRequest = Export-RubrikDatabase @ExportRubrikDatabase -Verbose #4>c:\temp\test.test
+
     $job = New-Object PSObject
     $job | Add-Member -type NoteProperty -name id -Value $RubrikRequest.id
     $job | Add-Member -type NoteProperty -name JobValues -Value $ExportRubrikDatabase
