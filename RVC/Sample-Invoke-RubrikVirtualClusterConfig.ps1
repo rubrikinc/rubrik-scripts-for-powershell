@@ -1,0 +1,15 @@
+$RVCDataDiskSize = 6144
+$RVCDataDiskType = "EagerZeroedThick"
+$RVCDataNetwork = "myFastDataNetwork"
+$RVCManagementNetwork = "myAwesomeManagementNetwork"
+$RVCName = "myCoolClusterName"
+$RVCNumNodes = 4
+$RVCNumDataDisks = 6
+$RVCOSDiskType = "EagerZeroedThick"
+$RVCOVAFile = "rubrik-vc-vr6412-esx-5.3.0-123456.ova"
+$VMwareCluster = "myNiceVMwareCluster"
+$VMwareCredentialFile = "myFantasticVCenterCreds.xml"
+$VMwareDataCenter = "myLovelyVMwareDataCenter"
+$VMwareDataStore = "myBigDataStore"
+$VMwareVCenter = "myFantasticVCenter"
+$VMwareVMFolder = "myStupendousVMFolderDir/myGreatVMFolderName"

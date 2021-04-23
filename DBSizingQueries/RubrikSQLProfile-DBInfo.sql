@@ -2,25 +2,52 @@
 Rubrik SQL Server profile queries.
 DBInfo
 *********************************************************/
-	IF OBJECT_ID('tempdb.dbo.##enterprise_features') IS NOT NULL
-  	DROP TABLE ##enterprise_features
+
+/**********************************************************
+Get what Enterprise Features are enabled
+*********************************************************/
+IF OBJECT_ID('tempdb.dbo.##enterprise_features') IS NOT NULL
+DROP TABLE ##enterprise_features
  
-	CREATE TABLE ##enterprise_features
-	(
-		ServerName	SYSNAME,
-		dbid		SYSNAME,
-		dbname       SYSNAME,
-		feature_name VARCHAR(100),
-		feature_id   INT
-	)
-		EXEC sp_msforeachdb
+CREATE TABLE ##enterprise_features(
+	ServerName	 SYSNAME,
+	dbid		 SYSNAME,
+	dbname       SYSNAME,
+	feature_name VARCHAR(100),
+	feature_id   INT
+)
+EXEC sp_msforeachdb
 	N' USE [?] 
---	IF (SELECT COUNT(*) FROM sys.dm_db_persisted_sku_features) > 0 
---	BEGIN 
+	--	IF (SELECT COUNT(*) FROM sys.dm_db_persisted_sku_features) > 0 
+	--	BEGIN 
 	INSERT INTO ##enterprise_features 
-		SELECT @@SERVERNAME, dbid=DB_ID(), dbname=DB_NAME(),feature_name,feature_id 
-		FROM sys.dm_db_persisted_sku_features 
---	END ';
+	SELECT @@SERVERNAME, dbid=DB_ID(), dbname=DB_NAME(),feature_name,feature_id 
+	FROM sys.dm_db_persisted_sku_features 
+	--	END ';
+
+/**********************************************************
+Get how many database files each database has
+*********************************************************/
+IF OBJECT_ID('tempdb.dbo.##database_files') IS NOT NULL
+DROP TABLE ##database_files
+ 
+CREATE TABLE ##database_files(
+	ServerName    SYSNAME,
+	database_id   SYSNAME,
+	DatabaseName  NVARCHAR(50),
+	NumberOfFiles INT
+)
+INSERT INTO ##database_files
+SELECT @@servername AS ServerName,
+	database_id, 
+	DB_NAME(database_id) as DatabaseName, 
+	COUNT(database_id) as NumberOfFiles
+FROM sys.master_files
+GROUP BY database_id;
+
+/**********************************************************
+Create the output for the server
+*********************************************************/
 
 WITH LogBackupInfo 
 AS
@@ -81,6 +108,11 @@ AS
 	FROM sys.databases db
 	JOIN sys.master_files mf ON db.database_id = mf.database_id
 	group by db.name
+),
+DBFiles
+AS
+(
+	SELECT * FROM ##database_files
 )
 
 SELECT
@@ -101,12 +133,14 @@ SELECT
 	,ISNULL(ef.[InMemoryOLTP], 0) AS InMemoryOLTP
 	,ISNULL(ef.[Partitioning],0) AS Partitioning
 	,ISNULL(ef.[TransparentDataEncryption],0) as TransparentDataEncryption
+	,DBFiles.NumberOfFiles
 FROM sys.databases db
-JOIN DBInfo on db.name = dbinfo.name
+JOIN DBInfo ON db.name = dbinfo.name
 LEFT OUTER JOIN LogBackupInfo lbi ON db.name = lbi.database_name
 LEFT OUTER JOIN FullBackupInfo fbi ON db.name = fbi.database_name
 LEFT OUTER JOIN LogBackupInterval lbii ON db.name = lbii.database_name
 LEFT OUTER JOIN EnterpriseFeatures ef ON db.name = ef.DatabaseName
+JOIN DBFiles ON db.name = DBFiles.DatabaseName
 WHERE db.database_id != 2
  --   AND lbii.PreviousBackupStartDate <> '1900-01-01 00:00:00.000'
 GROUP BY db.name
@@ -123,6 +157,7 @@ GROUP BY db.name
 	,ISNULL(ef.[InMemoryOLTP],0)
 	,ISNULL(ef.[Partitioning],0)
 	,ISNULL(ef.[TransparentDataEncryption],0)
+	,DBFiles.NumberOfFiles
 ORDER BY name
 
 
