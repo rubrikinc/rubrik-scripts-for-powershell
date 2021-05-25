@@ -6,7 +6,7 @@ $data = Get-Content $csvfile
 
 if ($data[0].Substring(1,10) -ne "ServerName")
 {
-    $Header ="ServerName","SQLVersion","name","recovery_model_desc","SevenDayLogBackupMB","AverageFullMB","AverageFullTimeSec","AverageLogTimeSec","DBTotalSizeMB","AverageLogBackupInterval","ChangeCapture","ColumnStoreIndex","Compression","FILESTREAM","InMemoryOLTP","Partitioning","TransparentDataEncryption", "NumberOfFiles"
+    $Header ="ServerName","SQLVersion","name","recovery_model_desc","SevenDayLogBackupMB","AverageFullMB","AverageFullTimeSec","AverageLogTimeSec","DBTotalSizeMB","AverageLogBackupInterval","ChangeCapture","ColumnStoreIndex","Compression","FILESTREAM","InMemoryOLTP","Partitioning","TransparentDatabaseEncryption", "NumberOfFiles"
     $rawdata = Get-Content $csvfile | ConvertFrom-Csv -Delimiter $delimiter -Header $Header
 }
 else 
@@ -33,7 +33,7 @@ $return = [ordered]@{
             'DBs with FILESTREAM' = ($rawdata | Measure-Object -Property 'FILESTREAM' -Sum).Sum
             'DBs with InMemoryOLTP' = ($rawdata | Measure-Object -Property 'InMemoryOLTP' -Sum).Sum
             'DBs with Partitioning' = ($rawdata | Measure-Object -Property 'Partitioning' -Sum).Sum
-            'DBs with TransparentDataEncryption' = ($rawdata | Measure-Object -Property 'TransparentDataEncryption' -Sum).Sum
+            'DBs with TransparentDatabaseEncryption' = ($rawdata | Measure-Object -Property 'TransparentDatabaseEncryption' -Sum).Sum
             'DBs with Greater than 300 Files' = ($rawdata | Where-Object {[int]$_.NumberOfFiles -ge 300} | Measure-Object).Count
         }
 
