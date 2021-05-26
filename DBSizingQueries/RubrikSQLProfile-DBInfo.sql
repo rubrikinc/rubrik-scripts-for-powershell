@@ -91,11 +91,11 @@ AS
 		,[MultipleFSContainers]
 		,[InMemoryOLTP]
 		,[Partitioning]
-		,[TransparentDataEncryption]
+		,[TransparentDatabaseEncryption]
 	FROM 
 	(SELECT dbname, feature_name FROM   ##enterprise_features) e
 	PIVOT
-	( COUNT(feature_name) FOR feature_name IN ([ChangeCapture], [ColumnStoreIndex], [Compression], [MultipleFSContainers],[InMemoryOLTP],[Partitioning],[TransparentDataEncryption]) )
+	( COUNT(feature_name) FOR feature_name IN ([ChangeCapture], [ColumnStoreIndex], [Compression], [MultipleFSContainers],[InMemoryOLTP],[Partitioning],[TransparentDatabaseEncryption]) )
 	AS PVT
 ), 
 DBInfo
@@ -132,7 +132,7 @@ SELECT
 	,ISNULL(ef.[MultipleFSContainers],0) AS FILESTREAM
 	,ISNULL(ef.[InMemoryOLTP], 0) AS InMemoryOLTP
 	,ISNULL(ef.[Partitioning],0) AS Partitioning
-	,ISNULL(ef.[TransparentDataEncryption],0) as TransparentDataEncryption
+	,ISNULL(ef.[TransparentDatabaseEncryption],0) as TransparentDatabaseEncryption
 	,DBFiles.NumberOfFiles
 FROM sys.databases db
 JOIN DBInfo ON db.name = dbinfo.name
@@ -156,7 +156,7 @@ GROUP BY db.name
 	,ISNULL(ef.[MultipleFSContainers],0)
 	,ISNULL(ef.[InMemoryOLTP],0)
 	,ISNULL(ef.[Partitioning],0)
-	,ISNULL(ef.[TransparentDataEncryption],0)
+	,ISNULL(ef.[TransparentDatabaseEncryption],0)
 	,DBFiles.NumberOfFiles
 ORDER BY name
 
