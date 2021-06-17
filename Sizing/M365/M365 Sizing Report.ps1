@@ -3,6 +3,34 @@ param (
     [Parameter()]
     [string]$Period = 'D180'
 )
+
+function Get-MgReport {
+    [CmdletBinding()]
+    param (
+        # MS Graph API report name
+        [Parameter(Mandatory)]
+        [String]
+        $ReportName,
+
+        # Report Period (Days)
+        [Parameter(Mandatory)]
+        [ValidateSet("7","30","90","180")]
+        [String]
+        $Period
+    )
+    
+    process {
+        try {
+            Invoke-MgGraphRequest -Uri "https://graph.microsoft.com/v1.0/reports/$($ReportName)(period=`'D$($Period)`')" -OutputFilePath "$env:TMPDIR\$ReportName.csv"
+
+            "$env:TMPDIR\$ReportName.csv"
+        }
+        catch {
+            throw $_.Exception
+        }
+        
+    }
+}
 function Measure-AverageGrowth {
     param (
         [string]$UsageReportCSV
