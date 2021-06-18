@@ -52,6 +52,7 @@
     Author:         Chris Lumnah
     Created Date:   6/17/2021
 #>
+#Requires -Module Microsoft.Graph
 [CmdletBinding()]
 param (
     [Parameter()]
