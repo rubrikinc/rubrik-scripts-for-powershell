@@ -4,7 +4,7 @@
 .DESCRIPTION
     Get-RubrikM365SizingInfo.ps1 returns statistics on number of accounts, sites and how much storage they are using in a Micosoft 365 Tennant
     In this script, Rubrik uses Microsoft Graph APIs to return data from the customer's M365 tennant. Data is collected via the Graph API
-    and then downloaded to the customer's machine. The downloaded reports can be found in the customers $ENV:TEMP folder. This data is left 
+    and then downloaded to the customer's machine. The downloaded reports can be found in the customers $systemTempFolder folder. This data is left 
     behind and never sent to Rubrik or viewed by Rubrik. 
 
 .EXAMPLE
@@ -60,6 +60,8 @@ param (
     [string]$Period = '180'
 )
 
+$systemTempFolder = [System.IO.Path]::GetTempPath()
+
 function Get-MgReport {
     [CmdletBinding()]
     param (
@@ -75,9 +77,9 @@ function Get-MgReport {
     
     process {
         try {
-            Invoke-MgGraphRequest -Uri "https://graph.microsoft.com/v1.0/reports/$($ReportName)(period=`'D$($Period)`')" -OutputFilePath "$env:temp\$ReportName.csv"
+            Invoke-MgGraphRequest -Uri "https://graph.microsoft.com/v1.0/reports/$($ReportName)(period=`'D$($Period)`')" -OutputFilePath "$systemTempFolder\$ReportName.csv"
 
-            "$env:temp\$ReportName.csv"
+            "$systemTempFolder\$ReportName.csv"
         }
         catch {
             throw $_.Exception
