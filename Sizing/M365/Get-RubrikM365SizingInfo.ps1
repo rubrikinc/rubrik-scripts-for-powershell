@@ -90,15 +90,15 @@ function Get-MgReport {
 function Measure-AverageGrowth {
     param (
         [Parameter(Mandatory)]
-        [string]$UsageReportCSV, 
+        [string]$ReportCSV, 
         [Parameter(Mandatory)]
         [string]$ReportName
 
     )
     if ($ReportName -eq 'getOneDriveUsageStorage'){
-        $UsageReport = Import-Csv -Path $UsageReportCSV | Where-Object {$_.'Site Type' -eq 'OneDrive'} |Sort-Object -Property "Report Date"
+        $UsageReport = Import-Csv -Path $ReportCSV | Where-Object {$_.'Site Type' -eq 'OneDrive'} |Sort-Object -Property "Report Date"
     }else{
-        $UsageReport = Import-Csv -Path $UsageReportCSV | Sort-Object -Property "Report Date"
+        $UsageReport = Import-Csv -Path $ReportCSV | Sort-Object -Property "Report Date"
     }
     
     $Record = 1
@@ -119,6 +119,24 @@ function Measure-AverageGrowth {
     $AverageGrowth = $StorageUsage | Measure-Object -Property Growth -Average
     return $AverageGrowth
 }
+
+function ProcessUsageReport {
+    param (
+        [Parameter(Mandatory)]
+        [string]$ReportCSV, 
+        [Parameter(Mandatory)]
+        [string]$ReportName,
+        [Parameter(Mandatory)]
+        [string]$Section
+    )
+
+    $ReportDetail = Import-Csv -Path $ReportCSV | Where-Object {$_.'Is Deleted' -eq 'FALSE'}
+    $SummarizedData = $ReportDetail | Measure-Object -Property 'Storage Used (Byte)' -Sum -Average
+    $M365Sizing.$($Section).NumberOfUsers = $SummarizedData.Count
+    $M365Sizing.$($Section).TotalSizeGB = [math]::Round(($SummarizedData.Sum / 1GB), 2, [MidPointRounding]::AwayFromZero)
+    $M365Sizing.$($Section).SizePerUserGB = [math]::Round((($SummarizedData.Average) / 1GB), 2)
+}
+
 
 Connect-MgGraph -Scopes @("Reports.Read.All")
 
@@ -141,57 +159,58 @@ $M365Sizing = @{
         SizePerUserGB = 0
         AverageGrowthPercentage = 0
     }
+    # Skype = @{
+    #     NumberOfUsers = 0
+    #     TotalSizeGB = 0
+    #     SizePerUserGB = 0
+    #     AverageGrowthPercentage = 0
+    # }
+    # Yammer = @{
+    #     NumberOfUsers = 0
+    #     TotalSizeGB = 0
+    #     SizePerUserGB = 0
+    #     AverageGrowthPercentage = 0
+    # }
+    # Teams = @{
+    #     NumberOfUsers = 0
+    #     TotalSizeGB = 0
+    #     SizePerUserGB = 0
+    #     AverageGrowthPercentage = 0
+    # }
 }
 
-#region Exchange Sizing Info
-$Section = 'Exchange'
-$UsageCountReport = Get-MgReport -ReportName 'getMailboxUsageMailboxCounts' -Period $Period
-$UsageCounts = Import-Csv -Path $UsageCountReport | Sort-Object -Property 'Report Date' -Descending | Select-Object -First 1
 
-$UsageStorageReport = Get-MgReport -ReportName 'getMailboxUsageStorage' -Period $Period
-$UsageStorage = Import-Csv -Path $UsageStorageReport | Sort-Object -Property 'Report Date' -Descending | Select-Object -First 1
-$MailboxAverageGowth = Measure-AverageGrowth -UsageReportCSV $UsageStorageReport -ReportName 'getMailboxUsageStorage'
-
-$M365Sizing.$($Section).NumberOfUsers = $UsageCounts.Total
-$M365Sizing.$($Section).TotalSizeGB = [math]::Round(($UsageStorage.'Storage Used (Byte)' / 1GB), 2)
-$M365Sizing.$($Section).SizePerUserGB = [math]::Round((($UsageStorage.'Storage Used (Byte)' / $M365Sizing.$($Section).NumberOfUsers) / 1GB), 2)
-$M365Sizing.$($Section).AverageGrowthPercentage = [math]::Round($MailboxAverageGowth.Average ,2)
+#region Usage Detail Reports
+# Run Usage Detail Reports for different sections to get counts, total size of each section and average size. 
+# We will only capture data that [Is Deleted] is equal to false. If [Is Deleted] is equal to True then that account has been deleted 
+# from the customers M365 tennant. It should not be counted in the sizing reports as We will not backup those objects. 
+$UsageDetailReports = @{}
+$UsageDetailReports.Add('Exchange', 'getMailboxUsageDetail')
+$UsageDetailReports.Add('OneDrive', 'getOneDriveUsageAccountDetail')
+$UsageDetailReports.Add('Sharepoint', 'getSharePointSiteUsageDetail')
+foreach($Section in $UsageDetailReports.Keys){
+    $ReportCSV = Get-MgReport -ReportName $UsageDetailReports[$Section] -Period $Period
+    ProcessUsageReport -ReportCSV $ReportCSV -ReportName $UsageDetailReports[$Section] -Section $Section
+}
 #endregion
 
-#region OneDrive Sizing Info
-$Section = 'OneDrive'
-$UsageCountReport = (Get-MgReport -ReportName 'getOneDriveUsageAccountCounts' -Period $Period)
-$UsageCounts = Import-Csv -Path $UsageCountReport | Sort-Object -Property 'Report Date' -Descending | Select-Object -First 1
-
-$UsageStorageReport = Get-MgReport -ReportName 'getOneDriveUsageStorage' -Period $Period
-$UsageStorage = Import-Csv -Path $UsageStorageReport | Sort-Object -Property 'Report Date' -Descending | Select-Object -First 1
-$MailboxAverageGowth = Measure-AverageGrowth -UsageReportCSV $UsageStorageReport -ReportName 'getOneDriveUsageStorage'
-
-$M365Sizing.$($Section).NumberOfUsers = $UsageCounts.Total
-$M365Sizing.$($Section).TotalSizeGB = [math]::Round(($UsageStorage.'Storage Used (Byte)' / 1GB), 2)
-$M365Sizing.$($Section).SizePerUserGB = [math]::Round((($UsageStorage.'Storage Used (Byte)' / $M365Sizing.$($Section).NumberOfUsers) / 1GB), 2)
-$M365Sizing.$($Section).AverageGrowthPercentage = [math]::Round($MailboxAverageGowth.Average ,2)
+#region Storage Usage Reports
+# Run Storage Usage Reports for each section get get a trend of storage used for the period provided. We will get the growth percentage
+# for each day and then average them all across the period provided. This way we can take into account the growth or the reduction 
+# of storage used across the entire period. 
+$StorageUsageReports = @{}
+$StorageUsageReports.Add('Exchange', 'getMailboxUsageStorage')
+$StorageUsageReports.Add('OneDrive', 'getOneDriveUsageStorage')
+$StorageUsageReports.Add('Sharepoint', 'getSharePointSiteUsageStorage')
+foreach($Section in $StorageUsageReports.Keys){
+    $ReportCSV = Get-MgReport -ReportName $StorageUsageReports[$Section] -Period $Period
+    $AverageGowth = Measure-AverageGrowth -ReportCSV $ReportCSV -ReportName $StorageUsageReports[$Section]
+    $M365Sizing.$($Section).AverageGrowthPercentage = [math]::Round($AverageGowth.Average ,2)
+}
 #endregion
-
-#region Sharepoint Sizing Info
-$Section = 'Sharepoint'
-$UsageCountReport = (Get-MgReport -ReportName 'getSharePointSiteUsageSiteCounts' -Period $Period)
-$UsageCounts = Import-Csv -Path $UsageCountReport | Sort-Object -Property 'Report Date' -Descending | Select-Object -First 1
-
-$UsageStorageReport = Get-MgReport -ReportName 'getSharePointSiteUsageStorage' -Period $Period
-$UsageStorage = Import-Csv -Path $UsageStorageReport | Sort-Object -Property 'Report Date' -Descending | Select-Object -First 1
-$MailboxAverageGowth = Measure-AverageGrowth -UsageReportCSV $UsageStorageReport -ReportName 'getSharePointSiteUsageStorage'
-
-$M365Sizing.$($Section).NumberOfSites = $UsageCounts.Total
-$M365Sizing.$($Section).TotalSizeGB = [math]::Round(($UsageStorage.'Storage Used (Byte)' / 1GB), 2)
-$M365Sizing.$($Section).SizePerUserGB = [math]::Round((($UsageStorage.'Storage Used (Byte)' / $M365Sizing.$($Section).NumberOfSites) / 1GB), 2)
-$M365Sizing.$($Section).AverageGrowthPercentage = [math]::Round($MailboxAverageGowth.Average ,2)
-#endregion
-
 
 Disconnect-MgGraph
 foreach($Section in $M365Sizing | Select-Object -ExpandProperty Keys){
-        
     Write-Output $Section | Out-File -FilePath .\RubrikMS365Sizing.txt -Append
     Write-Output $M365Sizing.$($Section)  | Out-File -FilePath .\RubrikMS365Sizing.txt -Append
     Write-Output "==========================================================================" | Out-File -FilePath .\RubrikMS365Sizing.txt -Append
