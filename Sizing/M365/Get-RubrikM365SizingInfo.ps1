@@ -57,9 +57,14 @@
 param (
     [Parameter()]
     [ValidateSet("7","30","90","180")]
-    [string]$Period = '180'
+    [string]$Period = '180',
+    # Parameter help description
+    [Parameter()]
+    [Switch]
+    $OutputObject
 )
 
+# Provide OS agnostic temp folder path for raw reports
 $systemTempFolder = [System.IO.Path]::GetTempPath()
 
 function Get-MgReport {
@@ -215,4 +220,9 @@ foreach($Section in $M365Sizing | Select-Object -ExpandProperty Keys){
     Write-Output $M365Sizing.$($Section)  | Out-File -FilePath .\RubrikMS365Sizing.txt -Append
     Write-Output "==========================================================================" | Out-File -FilePath .\RubrikMS365Sizing.txt -Append
 }
-return $M365Sizing 
+
+Write-Output "`n`nM365 Sizing information has been written to $((Get-ChildItem RubrikMS365Sizing.txt).FullName)`n`n"
+if ($OutputObject) {
+    return $M365Sizing
+}
+ 
