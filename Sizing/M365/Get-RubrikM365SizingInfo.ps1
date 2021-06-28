@@ -1,15 +1,15 @@
 <#
 .SYNOPSIS
-    Get-RubrikM365SizingInfo.ps1 returns statistics on number of accounts, sites and how much storage they are using in a Micosoft 365 Tennant
+    Get-RubrikM365SizingInfo.ps1 returns statistics on number of accounts, sites and how much storage they are using in a Micosoft 365 Tenant
 .DESCRIPTION
-    Get-RubrikM365SizingInfo.ps1 returns statistics on number of accounts, sites and how much storage they are using in a Micosoft 365 Tennant
-    In this script, Rubrik uses Microsoft Graph APIs to return data from the customer's M365 tennant. Data is collected via the Graph API
+    Get-RubrikM365SizingInfo.ps1 returns statistics on number of accounts, sites and how much storage they are using in a Micosoft 365 Tenant
+    In this script, Rubrik uses Microsoft Graph APIs to return data from the customer's M365 Tenant. Data is collected via the Graph API
     and then downloaded to the customer's machine. The downloaded reports can be found in the customers $systemTempFolder folder. This data is left 
     behind and never sent to Rubrik or viewed by Rubrik. 
 
 .EXAMPLE
     PS C:\> .\Get-RubrikM365SizingInfo.ps1
-    Will connect to customer's M365 tennant. A browser page will open up linking to the customer's M365 tennant authorization page. The 
+    Will connect to customer's M365 Tenant. A browser page will open up linking to the customer's M365 Tenant authorization page. The 
     customer will need to provide authorization. The script will gather data for 180 days. Once this is done output will be written to the current working directory as a file called 
     RubrikM365Sizing.txt
 .INPUTS
@@ -188,7 +188,7 @@ $M365Sizing = @{
 #region Usage Detail Reports
 # Run Usage Detail Reports for different sections to get counts, total size of each section and average size. 
 # We will only capture data that [Is Deleted] is equal to false. If [Is Deleted] is equal to True then that account has been deleted 
-# from the customers M365 tennant. It should not be counted in the sizing reports as We will not backup those objects. 
+# from the customers M365 Tenant. It should not be counted in the sizing reports as We will not backup those objects. 
 $UsageDetailReports = @{}
 $UsageDetailReports.Add('Exchange', 'getMailboxUsageDetail')
 $UsageDetailReports.Add('OneDrive', 'getOneDriveUsageAccountDetail')
