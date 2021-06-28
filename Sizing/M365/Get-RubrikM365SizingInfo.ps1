@@ -52,7 +52,7 @@
     Author:         Chris Lumnah
     Created Date:   6/17/2021
 #>
-#Requires -Module Microsoft.Graph
+#Requires -Modules Microsoft.Graph.Authentication, Microsoft.Graph.Reports
 [CmdletBinding()]
 param (
     [Parameter()]
@@ -145,24 +145,30 @@ function ProcessUsageReport {
 
 Connect-MgGraph -Scopes @("Reports.Read.All")
 
-$M365Sizing = @{
-    Exchange = @{
+$M365Sizing = [ordered]@{
+    Exchange = [ordered]@{
         NumberOfUsers = 0
-        TotalSizeGB = 0
+        TotalSizeGB   = 0
         SizePerUserGB = 0
         AverageGrowthPercentage = 0
     }
-    OneDrive = @{
+    OneDrive = [ordered]@{
         NumberOfUsers = 0
-        TotalSizeGB = 0
+        TotalSizeGB   = 0
         SizePerUserGB = 0
         AverageGrowthPercentage = 0
     }
-    Sharepoint = @{
+    Sharepoint = [ordered]@{
         NumberOfSites = 0
-        TotalSizeGB = 0
+        TotalSizeGB   = 0
         SizePerUserGB = 0
         AverageGrowthPercentage = 0
+    }
+    Licensing = [ordered]@{
+        Exchange   = 0
+        OneDrive   = 0
+        SharePoint = 0
+        Teams      = 0
     }
     # Skype = @{
     #     NumberOfUsers = 0
@@ -209,8 +215,8 @@ $StorageUsageReports.Add('OneDrive', 'getOneDriveUsageStorage')
 $StorageUsageReports.Add('Sharepoint', 'getSharePointSiteUsageStorage')
 foreach($Section in $StorageUsageReports.Keys){
     $ReportCSV = Get-MgReport -ReportName $StorageUsageReports[$Section] -Period $Period
-    $AverageGowth = Measure-AverageGrowth -ReportCSV $ReportCSV -ReportName $StorageUsageReports[$Section]
-    $M365Sizing.$($Section).AverageGrowthPercentage = [math]::Round($AverageGowth.Average ,2)
+    $AverageGrowth = Measure-AverageGrowth -ReportCSV $ReportCSV -ReportName $StorageUsageReports[$Section]
+    $M365Sizing.$($Section).AverageGrowthPercentage = [math]::Round($AverageGrowth.Average ,2)
 }
 #endregion
 
