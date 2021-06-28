@@ -1,15 +1,15 @@
 <#
 .SYNOPSIS
-    Get-RubrikM365SizingInfo.ps1 returns statistics on number of accounts, sites and how much storage they are using in a Micosoft 365 Tennant
+    Get-RubrikM365SizingInfo.ps1 returns statistics on number of accounts, sites and how much storage they are using in a Micosoft 365 Tenant
 .DESCRIPTION
-    Get-RubrikM365SizingInfo.ps1 returns statistics on number of accounts, sites and how much storage they are using in a Micosoft 365 Tennant
-    In this script, Rubrik uses Microsoft Graph APIs to return data from the customer's M365 tennant. Data is collected via the Graph API
+    Get-RubrikM365SizingInfo.ps1 returns statistics on number of accounts, sites and how much storage they are using in a Micosoft 365 Tenant
+    In this script, Rubrik uses Microsoft Graph APIs to return data from the customer's M365 Tenant. Data is collected via the Graph API
     and then downloaded to the customer's machine. The downloaded reports can be found in the customers $systemTempFolder folder. This data is left 
     behind and never sent to Rubrik or viewed by Rubrik. 
 
 .EXAMPLE
     PS C:\> .\Get-RubrikM365SizingInfo.ps1
-    Will connect to customer's M365 tennant. A browser page will open up linking to the customer's M365 tennant authorization page. The 
+    Will connect to customer's M365 Tenant. A browser page will open up linking to the customer's M365 Tenant authorization page. The 
     customer will need to provide authorization. The script will gather data for 180 days. Once this is done output will be written to the current working directory as a file called 
     RubrikM365Sizing.txt
 .INPUTS
@@ -52,7 +52,7 @@
     Author:         Chris Lumnah
     Created Date:   6/17/2021
 #>
-#Requires -Module Microsoft.Graph
+#Requires -Modules Microsoft.Graph.Authentication, Microsoft.Graph.Reports
 [CmdletBinding()]
 param (
     [Parameter()]
@@ -145,24 +145,31 @@ function ProcessUsageReport {
 
 Connect-MgGraph -Scopes @("Reports.Read.All")
 
-$M365Sizing = @{
-    Exchange = @{
+$M365Sizing = [ordered]@{
+    Exchange = [ordered]@{
         NumberOfUsers = 0
-        TotalSizeGB = 0
+        TotalSizeGB   = 0
         SizePerUserGB = 0
         AverageGrowthPercentage = 0
     }
-    OneDrive = @{
+    OneDrive = [ordered]@{
         NumberOfUsers = 0
-        TotalSizeGB = 0
+        TotalSizeGB   = 0
         SizePerUserGB = 0
         AverageGrowthPercentage = 0
     }
-    Sharepoint = @{
+    Sharepoint = [ordered]@{
         NumberOfSites = 0
-        TotalSizeGB = 0
+        TotalSizeGB   = 0
         SizePerUserGB = 0
         AverageGrowthPercentage = 0
+    }
+    Licensing = [ordered]@{
+        # Commented out for now, but we can get the number of licensed users if required (Not just activated).
+        # Exchange         = 0
+        # OneDrive         = 0
+        # SharePoint       = 0
+        # Teams            = 0
     }
     # Skype = @{
     #     NumberOfUsers = 0
@@ -188,7 +195,7 @@ $M365Sizing = @{
 #region Usage Detail Reports
 # Run Usage Detail Reports for different sections to get counts, total size of each section and average size. 
 # We will only capture data that [Is Deleted] is equal to false. If [Is Deleted] is equal to True then that account has been deleted 
-# from the customers M365 tennant. It should not be counted in the sizing reports as We will not backup those objects. 
+# from the customers M365 Tenant. It should not be counted in the sizing reports as We will not backup those objects. 
 $UsageDetailReports = @{}
 $UsageDetailReports.Add('Exchange', 'getMailboxUsageDetail')
 $UsageDetailReports.Add('OneDrive', 'getOneDriveUsageAccountDetail')
@@ -209,9 +216,26 @@ $StorageUsageReports.Add('OneDrive', 'getOneDriveUsageStorage')
 $StorageUsageReports.Add('Sharepoint', 'getSharePointSiteUsageStorage')
 foreach($Section in $StorageUsageReports.Keys){
     $ReportCSV = Get-MgReport -ReportName $StorageUsageReports[$Section] -Period $Period
-    $AverageGowth = Measure-AverageGrowth -ReportCSV $ReportCSV -ReportName $StorageUsageReports[$Section]
-    $M365Sizing.$($Section).AverageGrowthPercentage = [math]::Round($AverageGowth.Average ,2)
+    $AverageGrowth = Measure-AverageGrowth -ReportCSV $ReportCSV -ReportName $StorageUsageReports[$Section]
+    $M365Sizing.$($Section).AverageGrowthPercentage = [math]::Round($AverageGrowth.Average ,2)
 }
+#endregion
+
+#region License usage
+$licenseReportPath = Get-MgReport -ReportName getOffice365ActiveUserDetail -Period 180
+$licenseReport = Import-Csv -Path $licenseReportPath | Where-Object 'is deleted' -eq 'FALSE'
+
+# Clean up temp CSV
+Remove-Item -Path $licenseReportPath
+
+$assignedProducts = $licenseReport | ForEach-Object {$_.'Assigned Products'.Split('+')} | Group-Object | Select-Object Name,Count
+$assignedProducts | ForEach-Object {$M365Sizing.Licensing.Add($_.name, $_.count)}
+
+# We can add these back in if we want total licensed users for each feature.
+# $M365Sizing.Licensing.Exchange   = ($licenseReport | Where-Object 'Has Exchange License' -eq 'True' | measure-object).Count
+# $M365Sizing.Licensing.OneDrive   = ($licenseReport | Where-Object 'Has OneDrive License' -eq 'True' | measure-object).Count
+# $M365Sizing.Licensing.SharePoint = ($licenseReport | Where-Object 'Has Sharepoint License' -eq 'True' | measure-object).Count
+# $M365Sizing.Licensing.Teams      = ($licenseReport | Where-Object 'Has Teams License' -eq 'True' | measure-object).Count
 #endregion
 
 Disconnect-MgGraph
