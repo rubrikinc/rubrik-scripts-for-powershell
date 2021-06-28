@@ -165,10 +165,11 @@ $M365Sizing = [ordered]@{
         AverageGrowthPercentage = 0
     }
     Licensing = [ordered]@{
-        Exchange   = 0
-        OneDrive   = 0
-        SharePoint = 0
-        Teams      = 0
+        # Commented out for now, but we can get the number of licensed users if required (Not just activated).
+        # Exchange         = 0
+        # OneDrive         = 0
+        # SharePoint       = 0
+        # Teams            = 0
     }
     # Skype = @{
     #     NumberOfUsers = 0
@@ -218,6 +219,23 @@ foreach($Section in $StorageUsageReports.Keys){
     $AverageGrowth = Measure-AverageGrowth -ReportCSV $ReportCSV -ReportName $StorageUsageReports[$Section]
     $M365Sizing.$($Section).AverageGrowthPercentage = [math]::Round($AverageGrowth.Average ,2)
 }
+#endregion
+
+#region License usage
+$licenseReportPath = Get-MgReport -ReportName getOffice365ActiveUserDetail -Period 180
+$licenseReport = Import-Csv -Path $licenseReportPath | Where-Object 'is deleted' -eq 'FALSE'
+
+# Clean up temp CSV
+Remove-Item -Path $licenseReportPath
+
+$assignedProducts = $licenseReport | ForEach-Object {$_.'Assigned Products'.Split('+')} | Group-Object | Select-Object Name,Count
+$assignedProducts | ForEach-Object {$M365Sizing.Licensing.Add($_.name, $_.count)}
+
+# We can add these back in if we want total licensed users for each feature.
+# $M365Sizing.Licensing.Exchange   = ($licenseReport | Where-Object 'Has Exchange License' -eq 'True' | measure-object).Count
+# $M365Sizing.Licensing.OneDrive   = ($licenseReport | Where-Object 'Has OneDrive License' -eq 'True' | measure-object).Count
+# $M365Sizing.Licensing.SharePoint = ($licenseReport | Where-Object 'Has Sharepoint License' -eq 'True' | measure-object).Count
+# $M365Sizing.Licensing.Teams      = ($licenseReport | Where-Object 'Has Teams License' -eq 'True' | measure-object).Count
 #endregion
 
 Disconnect-MgGraph
