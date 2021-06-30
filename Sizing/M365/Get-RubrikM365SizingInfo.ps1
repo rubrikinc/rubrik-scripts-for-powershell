@@ -124,7 +124,6 @@ function Measure-AverageGrowth {
     $AverageGrowth = $StorageUsage | Measure-Object -Property Growth -Average
     return $AverageGrowth
 }
-
 function ProcessUsageReport {
     param (
         [Parameter(Mandatory)]
@@ -208,6 +207,7 @@ foreach($Section in $UsageDetailReports.Keys){
     $ReportCSV = Get-MgReport -ReportName $UsageDetailReports[$Section] -Period $Period
     ProcessUsageReport -ReportCSV $ReportCSV -ReportName $UsageDetailReports[$Section] -Section $Section
 }
+Remove-Item -Path $ReportCSV
 #endregion
 
 #region Storage Usage Reports
@@ -222,6 +222,7 @@ foreach($Section in $StorageUsageReports.Keys){
     $ReportCSV = Get-MgReport -ReportName $StorageUsageReports[$Section] -Period $Period
     $AverageGrowth = Measure-AverageGrowth -ReportCSV $ReportCSV -ReportName $StorageUsageReports[$Section]
     $M365Sizing.$($Section).AverageGrowthPercentage = [math]::Round($AverageGrowth.Average ,2)
+    Remove-Item -Path $ReportCSV
 }
 #endregion
 
