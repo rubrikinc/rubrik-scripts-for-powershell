@@ -241,7 +241,7 @@ $assignedProducts | ForEach-Object {$M365Sizing.Licensing.Add($_.name, $_.count)
 Disconnect-MgGraph
 foreach($Section in $M365Sizing | Select-Object -ExpandProperty Keys){
     Write-Output $Section | Out-File -FilePath .\RubrikMS365Sizing.txt -Append
-    Write-Output $M365Sizing.$($Section)  | Out-File -FilePath .\RubrikMS365Sizing.txt -Append
+    Write-Output $M365Sizing.$($Section) |Format-Table -AutoSize | Out-File -FilePath .\RubrikMS365Sizing.txt -Append
     Write-Output "==========================================================================" | Out-File -FilePath .\RubrikMS365Sizing.txt -Append
 }
 
