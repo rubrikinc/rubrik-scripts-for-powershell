@@ -137,7 +137,11 @@ function ProcessUsageReport {
 
     $ReportDetail = Import-Csv -Path $ReportCSV | Where-Object {$_.'Is Deleted' -eq 'FALSE'}
     $SummarizedData = $ReportDetail | Measure-Object -Property 'Storage Used (Byte)' -Sum -Average
-    $M365Sizing.$($Section).NumberOfUsers = $SummarizedData.Count
+    $Section
+    switch ($Section) {
+        'Sharepoint' { $M365Sizing.$($Section).NumberOfSites = $SummarizedData.Count }
+        Default {$M365Sizing.$($Section).NumberOfUsers = $SummarizedData.Count}
+    }
     $M365Sizing.$($Section).TotalSizeGB = [math]::Round(($SummarizedData.Sum / 1GB), 2, [MidPointRounding]::AwayFromZero)
     $M365Sizing.$($Section).SizePerUserGB = [math]::Round((($SummarizedData.Average) / 1GB), 2)
 }
