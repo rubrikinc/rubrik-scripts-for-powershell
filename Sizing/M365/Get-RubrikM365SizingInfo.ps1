@@ -121,7 +121,10 @@ function Measure-AverageGrowth {
         }
         $Record = $Record + 1
     }
-    $AverageGrowth = $StorageUsage | Measure-Object -Property Growth -Average
+    
+    $AverageGrowth = ($StorageUsage | Measure-Object -Property Growth -Average).Average
+    # AverageGrowth is based on 180 days. This is not annual growth. To provide an annual growth we will take the value of AverageGrowth * 2 and then round up to the nearest whole percentage. While this is not exact, it should be close enough for our purposes.
+    $AverageGrowth = [math]::Ceiling(($AverageGrowth * 2)) 
     return $AverageGrowth
 }
 function ProcessUsageReport {
@@ -136,7 +139,6 @@ function ProcessUsageReport {
 
     $ReportDetail = Import-Csv -Path $ReportCSV | Where-Object {$_.'Is Deleted' -eq 'FALSE'}
     $SummarizedData = $ReportDetail | Measure-Object -Property 'Storage Used (Byte)' -Sum -Average
-    $Section
     switch ($Section) {
         'Sharepoint' { $M365Sizing.$($Section).NumberOfSites = $SummarizedData.Count }
         Default {$M365Sizing.$($Section).NumberOfUsers = $SummarizedData.Count}
@@ -221,7 +223,7 @@ $StorageUsageReports.Add('Sharepoint', 'getSharePointSiteUsageStorage')
 foreach($Section in $StorageUsageReports.Keys){
     $ReportCSV = Get-MgReport -ReportName $StorageUsageReports[$Section] -Period $Period
     $AverageGrowth = Measure-AverageGrowth -ReportCSV $ReportCSV -ReportName $StorageUsageReports[$Section]
-    $M365Sizing.$($Section).AverageGrowthPercentage = [math]::Round($AverageGrowth.Average ,2)
+    $M365Sizing.$($Section).AverageGrowthPercentage = [math]::Round($AverageGrowth,2)
     Remove-Item -Path $ReportCSV
 }
 #endregion
