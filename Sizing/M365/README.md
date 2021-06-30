@@ -13,12 +13,12 @@ This document contains instructions on how to use the Rubrik M365 Protection Siz
 
 ## Installation
 
-1. Install the `Microsoft.Graph` PowerShell module from the PowerShell Gallery
+1. Install the `Microsoft.Graph.Authenication and Microsoft.Graph.Reports` PowerShell module from the PowerShell Gallery
     ```
-    Install-Module Microsoft.Graph
+    Install-Module Microsoft.Graph.Authenication, Microsoft.Graph.Reports
     ```
 
-2. Download the M365 Sizing script https://raw.githubusercontent.com/rubrikinc/rubrik-scripts-for-powershell/Sizing/M365/Get-RubrikM365SizingInfo.ps1
+2. Download the M365 Sizing script https://github.com/rubrikinc/rubrik-scripts-for-powershell/blob/master/Sizing/M365/Get-RubrikM365SizingInfo.ps1
 
 
 
