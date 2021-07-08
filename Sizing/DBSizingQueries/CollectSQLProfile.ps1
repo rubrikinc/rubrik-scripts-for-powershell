@@ -1,11 +1,13 @@
 ﻿[cmdletbinding()]
 param(
-    [string[]] $SQLInstance 
-    ,[string] $OutPath = [Environment]::GetFolderPath("MyDocuments")
-    ,[string] $QueryPath = '.\'
-    ,[Switch] $Anonymize
-    ,[string] $SqlUser
-    ,[string] $SqlPassword
+    [string[]] $SQLInstance,
+    [string] $OutPath = [Environment]::GetFolderPath("MyDocuments"),
+    [string] $QueryPath = '.\',
+    [Switch] $Anonymize,
+    [ValidateNotNull()]
+    [System.Management.Automation.PSCredential]
+    [System.Management.Automation.Credential()]
+    $Credential = [System.Management.Automation.PSCredential]::Empty
 )
 BEGIN{
     if(Get-Module -ListAvailable SqlServer){Import-Module SqlServer}
@@ -19,8 +21,13 @@ BEGIN{
 PROCESS{
     foreach($i in $SQLInstance){
         $svr = new-object "Microsoft.SqlServer.Management.Smo.Server" $i;
+        if (![string]::IsNullOrEmpty($Credential.UserName)){
+            $svr.ConnectionContext.LoginSecure = $false
+            $svr.ConnectionContext.set_Login($Credential.UserName)
+            $svr.ConnectionContext.set_SecurePassword($Credential.Password)
+        }
         $svr.ConnectionContext.connectTimeout = 4
-        if ($svr.Edition -eq $null){
+        if ([string]::IsNullOrEmpty($svr.Edition)){
             Write-Warning "!!!!!!! Can not connect to the SQL Service on: $i !!!!!!!"
             $i | Out-File -FilePath (Join-Path -Path $OutPath -ChildPath "SizingQuery-ServerWeCouldNotConnectTo.txt") -Append
             continue
@@ -34,12 +41,12 @@ PROCESS{
             $OutFile = Join-Path -Path $OutPath -ChildPath $q.filename
 
             Write-Verbose "Collecting data from $i"
-            if($SqlUser -and $SqlPassword){
-                $output = Invoke-SqlCmd -ServerInstance "$i" -Database TempDB -Query "$sql" -Username $SqlUser -Password $SqlPassword
-            }
-            else{
-                $output = Invoke-SqlCmd -ServerInstance "$i" -Database TempDB -Query "$sql"
-            }
+            # if($SqlUser -and $SqlPassword){
+                # $output = Invoke-SqlCmd -ServerInstance "$i" -Database TempDB -Query "$sql" -Username $SqlUser -Password $SqlPassword
+            # }
+            # else{
+                $output = Invoke-SqlCmd -ServerInstance "$i" -Database TempDB -Query "$sql" -Credential $Credential
+            # }
 
             if($header -eq $true){
                 $output | ConvertTo-Csv -Delimiter '|' -NoTypeInformation | Out-File $OutFile -Append
