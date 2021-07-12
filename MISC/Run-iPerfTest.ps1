@@ -27,6 +27,7 @@
     This script is just a wrapper around the iperf.exe program to do the tests. Each test will be written to a text file into the location you are in at runtime. This script should be placed into the same folder as where you have iperf installed for ease of use. 
    
 #>
+#Requires -Module Rubrik
 [CmdletBinding()]
 param (
     [Parameter(Mandatory)]

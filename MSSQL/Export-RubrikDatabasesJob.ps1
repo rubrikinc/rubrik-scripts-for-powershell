@@ -36,7 +36,7 @@
                 RecoveryPoint   Can be user changed. A time  to which the database should be restored to. There are a few different possibilities
                                 latest:         This will tell Rubrik to export the database to the latest recovery point Rubrik knows about
                                                 This will include the last full and any logs to get to the latest recovery point
-                                last full:      This will tell Rubrik to restore back to the last full backup it has
+                                lastfull:       This will tell Rubrik to restore back to the last full backup it has
                                 Format:         (HH:MM:SS.mmm) or (HH:MM:SS.mmmZ) - Restores the database back to the local or UTC time (respectively) at the point in time specified within the last 24 hours
                                 Format:         Any valid <value> that PS Get-Date supports in: "Get-Date -Date <Value>"
                                                 Example: "2018-08-01T02:00:00.000Z" restores back to 2AM on August 1, 2018 UTC.
