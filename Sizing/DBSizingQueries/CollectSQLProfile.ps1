@@ -44,9 +44,7 @@ BEGIN{
         }
     }
 }
-
 PROCESS{
-
     foreach($i in $SQLInstance){
         $svr = new-object "Microsoft.SqlServer.Management.Smo.Server" $i;
         if (![string]::IsNullOrEmpty($Credential.UserName)){
