@@ -2,3 +2,4 @@
 .creds
 Export-RubrikDatabasesJobFile - DN Test.json
 .idea
+.DS_Store
