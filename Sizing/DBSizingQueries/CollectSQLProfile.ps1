@@ -1,6 +1,28 @@
-﻿[cmdletbinding()]
+﻿<#
+.SYNOPSIS
+    MSSQL Database Sizing Scripts for Rubrik
+    
+.EXAMPLE
+    To run the script use the below command with the SQLInstance parameter. Then provide that parameter with a comma separated list of SQL Servers. The script will use Windows Authentication to collect data. 
+    PS C:\> .\CollectSQLProfile.ps1 -SQLInstance SQL1, SQL2, SQL3, SQL4\Instance1
+
+.EXAMPLE
+    If you need to use SQL Authentication instead of Windows Authentication, then include the Credential parameter and provide it with a user name. You will be prompted for a password. 
+    PS C:\> .\CollectSQLProfile.ps1 -SQLInstance SQL1, SQL2, SQL3, SQL4\Instance1 -Credential sa
+
+.EXAMPLE
+    Instead of giving a comma separated list of sql servers, you can use the InstancesFile parameter. Provide a file that contains a list of sql server instances. Each instance should be on a separate line.
+    PS C:\> .\CollectSQLProfile.ps1 -InstancesFile SQLInstances.txt
+.NOTES
+    Name:       MSSQL Database Sizing Scripts for Rubrik
+    Author:     Mike Fal, Chris Lumnah    
+#>
+[cmdletbinding()]
 param(
+    [Parameter(ParameterSetName='List Of Instances')]
     [string[]] $SQLInstance,
+    [Parameter(ParameterSetName='File Of Instances')]
+    [String] $InstancesFile,
     [string] $OutPath = [Environment]::GetFolderPath("MyDocuments"),
     [string] $QueryPath = '.\',
     [Switch] $Anonymize,
@@ -16,8 +38,12 @@ BEGIN{
     $queries = Get-ChildItem $QueryPath -Filter "*.sql"
     $queries | ForEach-Object {$_ | Add-Member -MemberType NoteProperty -Name FileName -Value "$($_.Name.Replace('.sql',''))-$(Get-Date -Format 'yyyyMMddHHmm').csv"}
     $header = $true
+    if (![string]::IsNullOrEmpty($InstancesFile)){
+        if (Test-Path $InstancesFile){
+            $SQLInstance = Get-Content -Path $InstancesFile
+        }
+    }
 }
-
 PROCESS{
     foreach($i in $SQLInstance){
         $svr = new-object "Microsoft.SqlServer.Management.Smo.Server" $i;
@@ -41,12 +67,7 @@ PROCESS{
             $OutFile = Join-Path -Path $OutPath -ChildPath $q.filename
 
             Write-Verbose "Collecting data from $i"
-            # if($SqlUser -and $SqlPassword){
-                # $output = Invoke-SqlCmd -ServerInstance "$i" -Database TempDB -Query "$sql" -Username $SqlUser -Password $SqlPassword
-            # }
-            # else{
-                $output = Invoke-SqlCmd -ServerInstance "$i" -Database TempDB -Query "$sql" -Credential $Credential
-            # }
+            $output = Invoke-SqlCmd -ServerInstance "$i" -Database TempDB -Query "$sql" -Credential $Credential
 
             if($header -eq $true){
                 $output | ConvertTo-Csv -Delimiter '|' -NoTypeInformation | Out-File $OutFile -Append

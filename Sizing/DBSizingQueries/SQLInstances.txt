@@ -1,0 +1,4 @@
+am1-chrilumn-w1\sql2019
+am1-chrilumn-w1\sql2017
+am1-sql16-1
+am1-sql17-1
