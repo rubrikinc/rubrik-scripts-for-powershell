@@ -35,10 +35,10 @@ Connect-Rubrik -Server $selected_cluster.ip -Username $selected_cluster.user `
 # Run query for missed jobs
 $missed_jobs = @()
 $timestamp = $($(Get-Date).ToUniversalTime().AddHours(-$time_period_hours) | get-date -format s) + 'Z'
-$events = Invoke-RubrikRestCall -Endpoint $('event?limit=9999&after_date='+$timestamp+'&event_type=Backup&status=Failure') -Method GET -api internal
-$events.data | % {
-    $this_event_timestamp = Convert-RubrikTimeStamp($_.time)
-    $newer_events = Invoke-RubrikRestCall -Endpoint $('event?after_date='+$($($($this_event_timestamp).ToUniversalTime().AddSeconds(1) | get-date -format s) + 'Z')+'&event_type=Backup&object_ids='+$_.objectId) -Method GET -api internal
+$events = Invoke-RubrikRestCall -Endpoint $('event/latest?limit=9&after_date='+$timestamp+'&event_type=Backup&event_status=Failure') -Method GET -api 1
+$events.data.latestevent | % {
+    #$this_event_timestamp = Convert-RubrikTimeStamp($_.time)
+    $newer_events = Invoke-RubrikRestCall -Endpoint $('event/latest?after_date='+$($($($_.time).ToUniversalTime().AddSeconds(1) | get-date -format s) + 'Z')+'&event_type=Backup&object_ids='+$_.time) -Method GET -api 1
     # Check if we have any newer events
     $all_ok = $false
     if ($newer_events.data) {
