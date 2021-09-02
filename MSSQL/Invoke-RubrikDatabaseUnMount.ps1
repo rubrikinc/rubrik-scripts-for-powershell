@@ -41,20 +41,10 @@
 param(
     [Parameter(Position=0)]
     [String]$RubrikServer,
-
-    [Parameter(ParameterSetName = 'CredentialFile', Position=1)]
-    [string]$RubrikCredentialFile,
-
-    [Parameter(ParameterSetName = 'Token', Position=1)]
-    [string]$Token,
-
-    [Parameter(ParameterSetName = 'CredentialFile')]
-    [Parameter(ParameterSetName = 'Token')]
+    
     [Parameter(ParameterSetName='ServerInstance', Position=2)]
     [String]$SourceServerInstance,
 
-    [Parameter(ParameterSetName = 'CredentialFile')]
-    [Parameter(ParameterSetName = 'Token')]
     [Parameter(ParameterSetName='AvailabilityGroup', Position=2)]
     [String]$AvailabilityGroupName,
 
@@ -62,33 +52,22 @@ param(
     [String[]]$Databases,
 
     [Parameter(Position=5)]
-    [String]$TargetServerInstance
+    [String]$TargetServerInstance,
+    
+    [Parameter(ParameterSetName = 'CredentialFile')]
+    [Parameter(ParameterSetName='ServerInstance')]
+    [Parameter(ParameterSetName='AvailabilityGroup')]
+    [string]$RubrikCredentialFile,
+
+    [Parameter(ParameterSetName = 'Token')]
+    [Parameter(ParameterSetName='ServerInstance')]
+    [Parameter(ParameterSetName='AvailabilityGroup')]
+    [string]$Token
 )
-#region Script Parameters For Testing
-# $PSBoundParameters.Add('RubrikServer','amer1-rbk01.rubrikdemo.com')
-# $PSBoundParameters.Add('SourceServerInstance','am1-sql16fc-1v')
-# $PSBoundParameters.Add('AvailabilityGroupName','am1-sql16ag-1ag')
-# $PSBoundParameters.Add('Databases','AdventureWorks2016')
-# $PSBoundParameters.Add('RecoveryPoint','latest')
-# $PSBoundParameters.Add('TargetServerInstance','am1-chrilumn-w1\sql2016')
-# $RubrikServer = $PSBoundParameters['RubrikServer']
-# $SourceServerInstance = $PSBoundParameters['SourceServerInstance']
-# $AvailabilityGroupName = $PSBoundParameters['AvailabilityGroupName']
-# $Databases = $PSBoundParameters['Databases']
-# $RecoveryPoint = $PSBoundParameters['RecoveryPoint']
-# $TargetServerInstance = $PSBoundParameters['TargetServerInstance']
-#endregion
-#region External Functions that need to be imported
-$Path = ".\Functions"
-Get-ChildItem -Path $Path -Filter *.ps1 |Where-Object { $_.FullName -ne $PSCommandPath } |ForEach-Object {
-    . $_.FullName
-}
-#endregion
 #region Required Modules for Script to run
-# Requires -Modules Rubrik, SQLServer, FailoverClusters
+#Requires -Modules Rubrik, SQLServer
 Import-Module Rubrik
 Import-Module SQLServer
-Import-Module FailoverClusters -SkipEditionCheck
 #endregion
 #region Rubrik Connection
 switch($true){
@@ -117,24 +96,8 @@ Connect-Rubrik @ConnectRubrik
 Write-Host "Get information about the SOURCE:$($SourceServerInstance)$($AvailabilityGroupName)" -ForegroundColor Green
 switch ($PSBoundParameters.Keys) {
     'SourceServerInstance' {
-        $SourceInstance = $SourceServerInstance.split("\")[1]
-        If([string]::IsNullOrEmpty($SourceInstance)){$SourceInstance = "MSSQLSERVER"}
-
-        $GetWindowsCluster = @{
+        $GetRubrikSQLInstance = @{
             ServerInstance = $SourceServerInstance
-            Instance = $SourceInstance
-        }
-        $Cluster =  Get-WindowsClusterResource @GetWindowsCluster
-
-        if ([bool]($Cluster.PSobject.Properties.name -match "Cluster") -eq $true){
-            $GetRubrikSQLInstance = @{
-                HostName = $Cluster.Cluster
-                Name = $SourceInstance
-            }
-        }else{
-            $GetRubrikSQLInstance = @{
-                ServerInstance = $SourceServerInstance
-            }
         }
         $SourceInstanceId = (Get-RubrikSQLInstance @GetRubrikSQLInstance).id
     }
@@ -150,81 +113,39 @@ switch ($PSBoundParameters.Keys) {
 
 #region Get information about the Target SQL Server
 Write-Host "Get information about the TARGET:$($TargetServerInstance)" -ForegroundColor Green
-$TargetInstance = $TargetServerInstance.split("\")[1]
-If([string]::IsNullOrEmpty($TargetInstance)){$TargetInstance = "MSSQLSERVER"}
-    
-$GetWindowsCluster = @{
+$GetRubrikSQLInstance = @{
     ServerInstance = $TargetServerInstance
-    Instance = $TargetInstance
-}
-
-$Cluster =  Get-WindowsClusterResource @GetWindowsCluster
-if ([bool]($Cluster.PSobject.Properties.name -match "Cluster") -eq $true){
-    $GetRubrikSQLInstance = @{
-        HostName = $Cluster.Cluster
-        Name  = $TargetSQLInstance
-    }
-} else {
-    $GetRubrikSQLInstance = @{
-        ServerInstance = $TargetServerInstance
-    }
 }
 $TargetRubrikSQLInstance = Get-RubrikSQLInstance @GetRubrikSQLInstance
 #endregion
-$SubmittedJobs = @()
-# Measure-Command{
-    foreach ($Database in $Databases){
-        #region Get information about the Database
-        Write-Host "Get information about the DATABASE:$($Database)" -ForegroundColor Green
-        switch ($PSBoundParameters.Keys) {
-            'SourceServerInstance' {
-                $GetRubrikDatabase = @{
-                    InstanceID = $SourceInstanceId
-                    Name = $Database
-                }
-            }
-            'AvailabilityGroupName' {
-                $GetRubrikDatabase = @{
-                    AvailabilityGroupID = $SourceAvailabilityGroupID
-                    Name = $Database
-                }
-            }
-            'Default' {}
-        }
-        $RubrikDatabase =  Get-RubrikDatabase @GetRubrikDatabase | Where-Object {$_.isRelic -eq $false -and $_.isLiveMount -eq $false}
-        #endregion
-        # #region Get Database Recovery Point Info
-        # switch ($RecoveryPoint) {
-        #     "Latest" {
-        #         $GetRubrikDatabaseRecoveryPoint = @{
-        #             id = $RubrikDatabase.id
-        #             Latest = $true
-        #         }
-        #     }
-        #     "LastFull" {
-        #         $GetRubrikDatabaseRecoveryPoint = @{
-        #             id = $RubrikDatabase.id
-        #             LastFull = $true
-        #         }
-        #     }
-        #     Default {
-        #         $GetRubrikDatabaseRecoveryPoint = @{
-        #             id = $RubrikDatabase.id
-        #             RestoreTime = $RecoveryPoint
-        #         }
-        #     }
-        # }
-        # $DatabaseRecoveryPoint = Get-RubrikDatabaseRecoveryPoint @GetRubrikDatabaseRecoveryPoint
-        # #endregion
-        
-        #Get the live Mount Info
-        $GetRubrikDatabaseMount = @{
-            SourceDatabaseID = $RubrikDatabase.id
-            TargetInstanceID = $TargetRubrikSQLInstance.id
-        }
-        $DatabaseMount = Get-RubrikDatabaseMount @GetRubrikDatabaseMount
 
-        Remove-RubrikDatabaseMount -id $DatabaseMount.id
+foreach ($Database in $Databases){
+    #region Get information about the Database
+    Write-Host "Get information about the DATABASE:$($Database)" -ForegroundColor Green
+    switch ($PSBoundParameters.Keys) {
+        'SourceServerInstance' {
+            $GetRubrikDatabase = @{
+                InstanceID = $SourceInstanceId
+                Name = $Database
+            }
+        }
+        'AvailabilityGroupName' {
+            $GetRubrikDatabase = @{
+                AvailabilityGroupID = $SourceAvailabilityGroupID
+                Name = $Database
+            }
+        }
+        'Default' {}
     }
+    $RubrikDatabase =  Get-RubrikDatabase @GetRubrikDatabase | Where-Object {$_.isRelic -eq $false -and $_.isLiveMount -eq $false}
+    #endregion
 
-# }
+    #Get the live Mount Info
+    $GetRubrikDatabaseMount = @{
+        SourceDatabaseID = $RubrikDatabase.id
+        TargetInstanceID = $TargetRubrikSQLInstance.id
+    }
+    $DatabaseMount = Get-RubrikDatabaseMount @GetRubrikDatabaseMount
+
+    Remove-RubrikDatabaseMount -id $DatabaseMount.id
+}
