@@ -10,10 +10,10 @@ param(
 
 clear-host
 
-$usage = "Create_Rubrik_User.ps1 -vCenter vCenterFQDNorIP -Username RubrikServiceAccountName -Domain SAMAuthenticationDomain"
-$example = 'Create_Rubrik_User.ps1 -vCenter "vcenter.rubrik.local" -Username svc_rubrik -Domain Rubrik.com' 
+$usage = ".\create_vCenter_User.ps1 -vCenter vCenterFQDNorIP -Username RubrikServiceAccountName -Domain SAMAuthenticationDomain"
+$example = '.\create_vCenter_User.ps1 -vCenter "vcenter.rubrik.local" -Username svc_rubrik -Domain Rubrik.com' 
 
-Write-Host "PowerCLI script to create Rubrik Role which includes required privileges and assigns the Rubrik Service Account to Role" `
+Write-Host "PowerCLI script to create Rubrik Role which includes required privileges and assigns the designated Rubrik Service Account to Role" `
   -ForeGroundColor Cyan 
 
 if ( !$vCenter -or !$Username -or !$Domain ) {
@@ -100,8 +100,8 @@ $Rubrik_Privileges = @(
 )
 
 Write-Host "Connecting to vCenter at $vCenter.  A prompt should be presented shortly."`n -ForeGroundColor Cyan
-Write-Host "You will need to provide a System Administrator account to create the Role and assign that role to $Rubrik_User"`n -ForeGroundColor Cyan
-Connect-VIServer $vCenter -Force | Out-Null
+Write-Host "You will need to provide credentials for a vCenter account with admin privileges to create the Role and assign that role to $Rubrik_User"`n -ForeGroundColor Cyan
+Connect-VIServer $vCenter -Force | Out-Null # Added '-Force' to avoid certificate warnings leading to login failures
 
 Write-Host "Creating a new role called $Rubrik_Role "`n -ForeGroundColor Cyan 
 New-VIRole -Name $Rubrik_Role -Privilege (Get-VIPrivilege -id $Rubrik_Privileges) | Out-Null
@@ -109,7 +109,7 @@ New-VIRole -Name $Rubrik_Role -Privilege (Get-VIPrivilege -id $Rubrik_Privileges
 #Get the Root Folder
 $rootFolder = Get-Folder -NoRecursion
 #Create the Permission
-Write-Host "Granging permissions on object $rootFolder to $Rubrik_User as role $Rubrik_Role with Propagation = $true"`n -ForeGroundColor Cyan
+Write-Host "Granting permissions on object $rootFolder to $Rubrik_User as role $Rubrik_Role with Propagation = $true"`n -ForeGroundColor Cyan
 New-VIPermission -Entity $rootFolder -Principal $Rubrik_User -Role $Rubrik_Role -Propagate:$true | Out-Null
 
 #Disconnect from the vCenter Server
