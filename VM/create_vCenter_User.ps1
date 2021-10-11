@@ -40,19 +40,27 @@ $Rubrik_Privileges = @(
   'Datastore.Delete'
   'Datastore.FileManagement'
   'Datastore.Move'
-  'Global.DisableMethods'
-  'Global.EnableMethods'
+  #'Global.DisableMethods' # Commented out due to lack of listing in Rubrik CDM Documentation; will remove altogether in a future commit
+  #'Global.EnableMethods' # Commented out due to lack of listing in Rubrik CDM Documentation; will remove altogether in a future commit
+  'Global.ManageCustomFields' # Added per Rubrik CDM 6.0 Documentation
+  'Global.SetCustomField' # Added per Rubrik CDM 6.0 Documentation
   'Global.Licenses'
-  'Host.Config.Image'  
-  'Host.Config.Storage'
+  'Host.Config.Image' # Added for CDP filter driver management 
+  'Host.Config.Maintenance' # Added for CDP filter driver management
+  'Host.Config.Patch' # Added for CDP filter driver management
+  'Host.Config.Storage' # Added for Live Mount
+  'Host.Config.SystemManagement' # Added for AppFlows agentless recoveries
+  'InventoryService.Tagging.AttachTag' # Used by Rubrik to reapply tags when recovering virtual machines. (vSphere 6.7 or earlier only)
+  # Need to find vSphere 7 Object-scoped permission name; do in a lab with vCenter 7.0; will add in a future commit
   'Network.Assign'
   'Resource.AssignVMToPool'
   'Resource.ColdMigrate'
   'Resource.HotMigrate'
+  'Resource.QueryVMotion' # Check for vMotion in flight before taking snapshot
   'Sessions.TerminateSession'
   'Sessions.ValidateSession'
-  'StorageProfile.View'
-  'StorageViews.View'
+  'StorageProfile.Update' # Added for CDP filter driver management
+  'StorageProfile.View' # Added for CDP filter driver management
   'System.Anonymous'
   'System.Read'
   'System.View'
