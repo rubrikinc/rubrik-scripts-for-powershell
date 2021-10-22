@@ -158,14 +158,8 @@ function Start-DiskspdTest{
     foreach ($Volume in $Volumes){
         foreach ($IOType in $IOTypes){
             switch ($IOType){
-                "read" {
-                    $WriteTest = 0
-                    $arguments = "-c$($DataFileSize) -w$($WriteTest) -t$($Threads) -d$($TestDuration) -o$($IODepth) -b$($ReadBlockSize) -Z$($EntropySize) -W20 -Rxml -si -L $($Volume.Name)iotest.dat"
-                }
-                "write" {
-                    $WriteTest = 100
-                    $arguments = "-c$($DataFileSize) -w$($WriteTest) -t$($Threads) -d$($TestDuration) -o$($IODepth) -b$($WriteBlockSize) -Z$($EntropySize) -W20 -Rxml -si -L $($Volume.Name)iotest.dat"
-                }
+                "read" {$WriteTest = 0}
+                "write" {$WriteTest = 100}
             }
             foreach($IODepth in $IODepths){
                 #region timestamp output file
@@ -174,7 +168,16 @@ function Start-DiskspdTest{
                 #endregion
 
                 Write-Progress -Activity "Executing DiskSpd Tests..." -Status "Executing Test $TestNumber of $TestCount" -PercentComplete ( ($TestNumber / ($TestCount)) * 100 )
-                
+                switch ($IOType){
+                    "read" {
+                        $WriteTest = 0
+                        $arguments = "-c$($DataFileSize) -w$($WriteTest) -t$($Threads) -d$($TestDuration) -o$($IODepth) -b$($ReadBlockSize) -Z$($EntropySize) -W20 -Rxml -si -L $($Volume.Name)iotest.dat"
+                    }
+                    "write" {
+                        $WriteTest = 100
+                        $arguments = "-c$($DataFileSize) -w$($WriteTest) -t$($Threads) -d$($TestDuration) -o$($IODepth) -b$($WriteBlockSize) -Z$($EntropySize) -W20 -Rxml -si -L $($Volume.Name)iotest.dat"
+                    }
+                }
 
                 # Write-Output "diskspd.exe  $arguments" 
 
