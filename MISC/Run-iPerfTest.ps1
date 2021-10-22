@@ -68,7 +68,7 @@ foreach($RubrikNode in $RubrikNodes){
             Write-Host "Running .\iperf.exe -c $($RubrikNode.ipAddress) -i 5 -t 60 -w 1M"
             .\iperf.exe -c $RubrikNode.ipAddress -i 5 -t 60 -w 1M > "iperf_$($HostName)_to_$($RubrikNode.ipAddress)_1MB_1_Thread.txt"
 
-            Write-Host "Running .\iperf.exe -c $($RubrikNode.ipAddress) -i 5 -t 60 -w 1M -P 8"
+            Write-Host "Running .\iperf.exe -c $($RubrikNode.ipAddress) -i 5 -t 60 -w 1M -P 16"
             .\iperf.exe -c $RubrikNode.ipAddress -i 5 -t 60 -w 1M -P 8 > "iperf_$($HostName)_to_$($RubrikNode.ipAddress)_1MB_8_Threads.txt"
         }
         3 {
@@ -78,7 +78,7 @@ foreach($RubrikNode in $RubrikNodes){
             Write-Host "Running .\iperf3.exe -c $($RubrikNode.ipAddress) -i 5 -t 60 -w 1M"
             .\iperf3.exe -c $RubrikNode.ipAddress -i 5 -t 60 -w 1M > "iperf_$($HostName)_to_$($RubrikNode.ipAddress)_1MB_1_Thread.txt"
 
-            Write-Host "Running .\iperf3.exe -c $($RubrikNode.ipAddress) -i 5 -t 60 -w 1M -P 8 "
+            Write-Host "Running .\iperf3.exe -c $($RubrikNode.ipAddress) -i 5 -t 60 -w 1M -P 16 "
             .\iperf3.exe -c $RubrikNode.ipAddress -i 5 -t 60 -w 1M -P 8 > "iperf_$($HostName)_to_$($RubrikNode.ipAddress)_1MB_8_Threads.txt"
         }
     }
