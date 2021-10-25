@@ -97,13 +97,13 @@ param (
     [Parameter(Mandatory=$false,Position=5)]
     $ReadBlockSize = "1M",
     
-    [Parameter(Mandatory=$false,Position=5)]
+    [Parameter(Mandatory=$false,Position=6)]
     $WriteBlockSize = "4M",
 
-    [Parameter(Mandatory=$false,Position=6)]
+    [Parameter(Mandatory=$false,Position=7)]
     $Threads = 16,
 
-    [Parameter(Mandatory=$false,Position=7)]
+    [Parameter(Mandatory=$false,Position=8)]
     $ThrottleLimit = 2
 )
 #region Variables
