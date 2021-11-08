@@ -1,5 +1,4 @@
-# PowerCLI script to create Rubrik Role which includes required permissions and assign Rubrik Service Account and Role at the root of Hosts and Clusters
-# Usage Create_Rubrik_Role.ps1 -vCenter vCenterFQDNorIP -Username ServiceAccountName -Domain AuthenticationDomain
+#requires -modules VMware.VimAutomation.Core
 
 # Get Commandline Parameters - All are required
 param(
