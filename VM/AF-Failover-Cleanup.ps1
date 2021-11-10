@@ -45,11 +45,11 @@ None; pipes not supported
 
 .EXAMPLE
 
-PS > .\AF-Failover-Cleanup.ps1 -VIServer vcsa.local
+PS > .\AF-Failover-Cleanup.ps1 -VIServer vcsa.rubrik.lab
 
 .EXAMPLE
 
-PS > .\AF-Failover-Cleanup.ps1 -VIServer vcsa.local -IgnoreVICert -Delete
+PS > .\AF-Failover-Cleanup.ps1 -VIServer vcsa.rubrik.lab -IgnoreVICert -Delete
 
 This script will remove all VMs renamed as Deprecated after an AppFlows failover event.
 
@@ -57,8 +57,8 @@ You will be prompted to provide credentials for a vCenter account with sufficien
 
 Specify Credential
 Please specify server credential
-User: joe.harlan.adm@rtt.lab
-Password for user joe.harlan.adm@rtt.lab: **********
+User: joe.harlan.adm@rubrik.lab
+Password for user joe.harlan.adm@rubrik.lab: **********
 
 Name                 PowerState Num CPUs MemoryGB
 ----                 ---------- -------- --------
@@ -73,7 +73,7 @@ Perform operation?
 Performing operation 'Removing VM from inventory.' on VM 'Deprecated_Server01'
 [Y] Yes [A] Yes to All [N] No [L] No to All [S] Suspend [?] Help (default is "Yes"): A
                                                                                                                         
-Disconnecting from vCenter at afpri-vcsa.rtt.lab
+Disconnecting from vCenter at vcsa.rubrik.lab
 
 #>
 
