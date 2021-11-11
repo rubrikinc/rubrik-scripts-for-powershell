@@ -223,12 +223,13 @@ elseif (Test-Path $vCenterCredFile) {
 
 
 Write-Host "Creating a new role called $RubrikRole "`n -ForeGroundColor Cyan 
+New-VIRole -Name $RubrikRole -Privilege (Get-VIPrivilege -id $Rubrik_Privileges) | Out-Null
 
 #Get the Root Folder
 $rootFolder = Get-Folder -NoRecursion
 #Create the Permission
-Write-Host "Granting permissions on object $rootFolder to $Rubrik_User as role $Rubrik_Role with Propagation = $true"`n -ForeGroundColor Cyan
-New-VIPermission -Entity $rootFolder -Principal $Rubrik_User -Role $Rubrik_Role -Propagate:$true | Out-Null
+Write-Host "Granting permissions on object $rootFolder to $RubrikUser as role $RubrikRole with Propagation = $true"`n -ForeGroundColor Cyan
+New-VIPermission -Entity $rootFolder -Principal $RubrikUser -Role $RubrikRole -Propagate:$true | Out-Null
 
 #Disconnect from the vCenter Server
 Write-Host "Disconnecting from vCenter at $vCenter"`n -ForeGroundColor Cyan
