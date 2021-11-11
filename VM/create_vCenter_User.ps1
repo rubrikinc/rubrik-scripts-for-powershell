@@ -49,6 +49,15 @@ param (
   [Parameter(Mandatory = $true)]
   # Hostname, FQDN or IP of the vCenter server.
  [string]$vCenter,
+
+  [Parameter(Mandatory = $false)]
+  # vCenter user with with admin privileges to create the Role and assign that role.
+  [string]$vCenterAdminUser = $null,
+
+  [Parameter(Mandatory = $false)]
+  # Password for vCenter admin user.
+  [string]$vCenterAdminPassword = $null,
+
   [Parameter(Mandatory = $true)]
   # Rubrik Service Account in vSphere to assign Rubrik privileges to.
  [string]$Username,
@@ -69,6 +78,8 @@ param (
   [string]$vCenterType,
 
   [Parameter(Mandatory = $false)]
+  # vCenter credential file to use. Default is ./vcenter_cred.xml.
+  [string]$vCenterCredFile = './vcenter_cred.xml'
 )
 
 Import-Module VMware.VimAutomation.Core
