@@ -95,12 +95,15 @@ param (
     $DataFileSize = "5G",
 
     [Parameter(Mandatory=$false,Position=5)]
-    $BlockSize = "1M",
-
+    $ReadBlockSize = "1M",
+    
     [Parameter(Mandatory=$false,Position=6)]
-    $Threads = 8,
+    $WriteBlockSize = "4M",
 
     [Parameter(Mandatory=$false,Position=7)]
+    $Threads = 16,
+
+    [Parameter(Mandatory=$false,Position=8)]
     $ThrottleLimit = 2
 )
 #region Variables
@@ -114,7 +117,8 @@ function Start-DiskspdTest{
         $diskspdPath,
         $DataFileSize,
         $Threads,
-        $BlockSize,
+        $ReadBlockSize,
+        $WriteBlockSize,
         $EntropySize,
         $OutPath
     )
@@ -164,7 +168,16 @@ function Start-DiskspdTest{
                 #endregion
 
                 Write-Progress -Activity "Executing DiskSpd Tests..." -Status "Executing Test $TestNumber of $TestCount" -PercentComplete ( ($TestNumber / ($TestCount)) * 100 )
-                $arguments = "-c$($DataFileSize) -w$($WriteTest) -t$($Threads) -d$($TestDuration) -o$($IODepth) -b$($BlockSize) -Z$($EntropySize) -W20 -Rxml -si -L $($Volume.Name)iotest.dat"
+                switch ($IOType){
+                    "read" {
+                        $WriteTest = 0
+                        $arguments = "-c$($DataFileSize) -w$($WriteTest) -t$($Threads) -d$($TestDuration) -o$($IODepth) -b$($ReadBlockSize) -Z$($EntropySize) -W20 -Rxml -si -L $($Volume.Name)iotest.dat"
+                    }
+                    "write" {
+                        $WriteTest = 100
+                        $arguments = "-c$($DataFileSize) -w$($WriteTest) -t$($Threads) -d$($TestDuration) -o$($IODepth) -b$($WriteBlockSize) -Z$($EntropySize) -W20 -Rxml -si -L $($Volume.Name)iotest.dat"
+                    }
+                }
 
                 # Write-Output "diskspd.exe  $arguments" 
 
@@ -187,13 +200,13 @@ foreach ($Computer in $ComputerName){
         $InvokeCommand = @{
             ComputerName = $Computer
             ScriptBlock = ${Function:Start-DiskspdTest}
-            ArgumentList = $Computer, $TestDuration,$diskspdPath, $DataFileSize, $Threads, $BlockSize, $EntropySize, $OutPath
+            ArgumentList = $Computer, $TestDuration,$diskspdPath, $DataFileSize, $Threads, $ReadBlockSize, $WriteBlockSize, $EntropySize, $OutPath
             ThrottleLimit = $ThrottleLimit
         }
     }else{
         $InvokeCommand = @{
             ScriptBlock = ${Function:Start-DiskspdTest}
-            ArgumentList = $Computer,$TestDuration,$diskspdPath, $DataFileSize, $Threads, $BlockSize, $EntropySize, $OutPath
+            ArgumentList = $Computer,$TestDuration,$diskspdPath, $DataFileSize, $Threads, $ReadBlockSize, $WriteBlockSize, $EntropySize, $OutPath
         }
     }
     Invoke-Command @InvokeCommand
