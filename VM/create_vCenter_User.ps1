@@ -57,6 +57,12 @@ param (
   # Domain of Rubrik Service Account in vSphere to assign Rubrik privileges to. 
   # The -Domain parameter format is expected to be SAM; do not use the FQDN of 
   # your domain name (e.g., RUBRIK)
+  [string]$Domain,
+
+  [Parameter(Mandatory = $false)]
+  # Role name to create. Default: Rubrik_Backup_Service
+  [string]$RubrikRole = 'Rubrik_Backup_Service',
+
   [Parameter(Mandatory = $true)]
   #Select the type of vCenter to add privileges for.
   [ValidateSet('ONPREM', 'VMC', 'AVS', 'GCVE')]
