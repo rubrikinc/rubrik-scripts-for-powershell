@@ -100,16 +100,16 @@ $Rubrik_AVS_Privileges = @(
   'Datastore.Browse'
   'Datastore.Config'
   'Datastore.FileManagement'
-  'Global.ManageCustomFields' # Added for newer versions of CDM
-  'Global.SetCustomField' #Added for newer versions of CDM
-  'InventoryService.Tagging.AttachTag' # Added for newer versions of CDM.
+  'Global.ManageCustomFields' # Added per Rubrik CDM 6.0 Documentation
+  'Global.SetCustomField' # Added per Rubrik CDM 6.0 Documentation
+  'InventoryService.Tagging.AttachTag' # Used by Rubrik to reapply tags when recovering virtual machines. (vSphere 6.7 or earlier only)
   'Network.Assign'
   'Resource.AssignVMToPool'
   'Resource.ColdMigrate'
   'Resource.HotMigrate'
-  'Resource.QueryVMotion' # Added for newer versions of CDM
+  'Resource.QueryVMotion' # Check for vMotion in flight before taking snapshot
   'Sessions.ValidateSession'
-  'StorageProfile.View'
+  'StorageProfile.View' # Added for CDP filter driver management
   'StorageViews.View'
   'System.Anonymous'
   'System.Read'
@@ -158,7 +158,7 @@ $Rubrik_AVS_Privileges = @(
 
 # These privileges are not allowed in AVS but are allowed in VMC and GCVE
 $Rubrik_VMC_GCVE_Privileges = $Rubrik_AVS_Privileges + @(
-  'StorageProfile.Update' # Added for newer versions of CDM. Not allowed in AVS at this time.
+  'StorageProfile.Update'  # Added for CDP filter driver management. Not allowed in AVS at this time.
   'VApp.Import' # Required for HotAdd proxies (VMC/GCVE/AVS only)
 )
 
@@ -170,10 +170,10 @@ $Rubrik_OnPrem_Privileges = $Rubrik_VMC_GCVE_Privileges + @(
   'Global.DisableMethods' # Added for AppFlows
   'Global.EnableMethods' # Added for AppFlows
   'Global.Licenses'
-  'Host.Config.Image'
-  'Host.Config.Maintenance'
-  'Host.Config.Patch'
-  'Host.Config.Storage'
+  'Host.Config.Image' # Added for CDP filter driver management
+  'Host.Config.Maintenance' # Added for CDP filter driver management
+  'Host.Config.Patch' # Added for CDP filter driver management
+  'Host.Config.Storage' # Added for Live Mount
   'Sessions.TerminateSession'
 )
 
