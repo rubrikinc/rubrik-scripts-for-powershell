@@ -3,3 +3,5 @@
 Export-RubrikDatabasesJobFile - DN Test.json
 .idea
 .DS_Store
+vcenter_cred*.xml
+settings.json
