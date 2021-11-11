@@ -44,9 +44,19 @@ Create the restricted permissions in an AVS vCenter and prompt for the vCenter u
 #>
 
 param (
+  [CmdletBinding()]
+
+  [Parameter(Mandatory = $true)]
+  # Hostname, FQDN or IP of the vCenter server.
  [string]$vCenter,
+  [Parameter(Mandatory = $true)]
+  # Rubrik Service Account in vSphere to assign Rubrik privileges to.
  [string]$Username,
- [string]$Domain
+
+  [Parameter(Mandatory = $true)]
+  # Domain of Rubrik Service Account in vSphere to assign Rubrik privileges to. 
+  # The -Domain parameter format is expected to be SAM; do not use the FQDN of 
+  # your domain name (e.g., RUBRIK)
 )
 
 Import-Module VMware.VimAutomation.Core
