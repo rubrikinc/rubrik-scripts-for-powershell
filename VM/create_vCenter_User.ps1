@@ -176,6 +176,9 @@ $Rubrik_OnPrem_Privileges = $Rubrik_VMC_GCVE_Privileges + @(
   'Host.Config.Storage' # Added for Live Mount
   'Sessions.TerminateSession'
 )
+$Rubrik_vCenter_7_Privileges = @(
+  'InventoryService.Tagging.ObjectAttachable' # Used by Rubrik to reapply tags when recovering virtual machines. (vSphere 7.0 or later only)
+)
 
 if ($vCenterType -eq 'ONPREM') {
   $Rubrik_Privileges = $Rubrik_OnPrem_Privileges
@@ -221,6 +224,17 @@ elseif (Test-Path $vCenterCredFile) {
   Connect-VIServer -Server $vCenter -Credential $credential -Force | Out-Null
 }
 
+# Check vCenter version and add appropriate privileges
+Write-Debug ('vCenter version is: ' + [System.Version]$Global:DefaultVIServer.Version)
+if ([System.Version]$Global:DefaultVIServer.Version -ge [System.Version]"7.0.0") {
+  Write-Debug 'Adding vCenter 7 privileges'
+  $Rubrik_Privileges = $Rubrik_Privileges + $Rubrik_vCenter_7_Privileges
+}
+
+Write-Debug 'Effective privileges are:'
+Write-Debug ($Rubrik_Privileges | Format-Table | Out-String)
+
+# Create new role
 Write-Host "Creating a new role called $RubrikRole "`n -ForeGroundColor Cyan 
 New-VIRole -Name $RubrikRole -Privilege (Get-VIPrivilege -id $Rubrik_Privileges) | Out-Null
 
