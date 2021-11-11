@@ -1,7 +1,49 @@
 #requires -modules VMware.VimAutomation.Core
 
-# Get Commandline Parameters - All are required
-param(
+# https://build.rubrik.com
+# https://github.com/rubrikinc/rubrik-scripts-for-powershell
+
+<#
+.SYNOPSIS
+Creates a new role in vSphere with the restricted privileges needed to run Rubrik CDM. Assigns role to 
+Rubrik Service Account at the root of Hosts and Clusters.
+
+.DESCRIPTION
+The create_vCenter_User.ps1 cmdlet will create a new role in a vCenter with the minimum privileges to 
+allow Rubrik CDM to perform data protection in vSphere. The new role will be assigned to a specified
+user in vCenter. Options are provided for creating roles in on-prem vCenters, VMware Cloud on AWS (VMC)
+vCenters, Azure VMware Cloud Solution (AVS) and  Google VMware Cloud Engine (GCVE).
+
+.NOTES
+Updated by Damani Norman for community usage
+GitHub: DamaniN
+
+You can use a vCenter credential file for authentication
+Default $vCenterCredFile = './vcenter_cred.xml'
+To create one: Get-Credential | Export-CliXml -Path ./vcenter_cred.xml
+
+.EXAMPLE
+create_vCenter_User.ps1 
+
+Create the restricted permissions and prompt for all of the variables.
+
+.EXAMPLE
+create_vCenter_User.ps1 -vCenter <vcenter_server> -vCenterAdminUser <vcenter_admin_user> -vCenterAdminPassword <vcenter_admin_password> -Username <username_for_rubrik_role> -Domain <domain_of_rubrik_role_username> -RubrikRole <role_name> -vCenterType ONPREM
+
+Create the restricted permissions in an On-Prem vCenter using a username and password specified on the command line.
+
+.EXAMPLE
+create_vCenter_User.ps1 -vCenter <vcenter_server> -vCenterCredFile <credential_file> -Username <username_for_rubrik_role> -Domain <domain_of_rubrik_role_username> -RubrikRole <role_name> -vCenterType VMC
+
+Create the restricted permissions in an VMC vCenter using a specific vCenter credential file.
+
+.EXAMPLE
+create_vCenter_User.ps1 -vCenter <vcenter_server> -Username <username_for_rubrik_role> -Domain <domain_of_rubrik_role_username> -RubrikRole <role_name> -vCenterType AVS
+
+Create the restricted permissions in an AVS vCenter and prompt for the vCenter username and password.
+#>
+
+param (
  [string]$vCenter,
  [string]$Username,
  [string]$Domain
