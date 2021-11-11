@@ -191,9 +191,38 @@ elseif ($vCenterType -eq 'VMC') {
 }
 
 Write-Host "Connecting to vCenter at $vCenter."`n -ForeGroundColor Cyan
+# If no credential file and no vCenter username/password provided then prompt for creds
+if (((Test-Path $vCenterCredFile) -eq $false) -and (!$vCenterAdminUser) -and (!$vCenterAdminPassword)) {
+  Write-Host ""
+  Write-Host "No credential file found ($vCenterCredFile), please provide vCenter credentials"
+  Connect-VIServer -Server $vCenter -Force | Out-Null
+}
+# Else if user is provided use the username and password
+elseif ($vCenterAdminUser) {
+  if ($vCenterAdminPassword) {
+    #        $vCenterAdminPassword = ConvertTo-SecureString $vCenterAdminPassword -AsPlainText -Force
 
-Write-Host "Creating a new role called $Rubrik_Role "`n -ForeGroundColor Cyan 
-New-VIRole -Name $Rubrik_Role -Privilege (Get-VIPrivilege -id $Rubrik_Privileges) | Out-Null
+    Connect-VIServer -Server $vCenter -Username $vCenterAdminUser -Password $vCenterAdminPassword -Force | Out-Null
+  }
+  # If username provided but not password, prompt for password
+  else {
+    Write-Host "Password not specified."
+    $credential = Get-Credential -Username $vCenterAdminUser
+
+    Connect-VIServer -Server $vCenter -Credential $credential -Force | Out-Null
+  }
+}
+# Else if credential file is found then use it
+elseif (Test-Path $vCenterCredFile) {
+
+  # Import Credential file
+  $credential = Import-Clixml -Path $vCenterCredFile
+
+  Connect-VIServer -Server $vCenter -Credential $credential -Force | Out-Null
+}
+
+
+Write-Host "Creating a new role called $RubrikRole "`n -ForeGroundColor Cyan 
 
 #Get the Root Folder
 $rootFolder = Get-Folder -NoRecursion
