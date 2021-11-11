@@ -86,46 +86,28 @@ Import-Module VMware.VimAutomation.Core
 
 clear-host
 
-$usage = ".\create_vCenter_User.ps1 -vCenter vCenterFQDNorIP -Username RubrikServiceAccountName -Domain SAMAuthenticationDomain"
-$example = '.\create_vCenter_User.ps1 -vCenter "vcenter.rubrik.local" -Username svc_rubrik -Domain Rubrik.com' 
-
 Write-Host "PowerCLI script to create Rubrik Role which includes required privileges and assigns the designated Rubrik Service Account to Role" `
   -ForeGroundColor Cyan 
 
-if ( !$vCenter -or !$Username -or !$Domain ) {
-  write-host `n "Missing Required Parameter - vCenter, Username, and Domain are required."`
-  `n "The -Domain parameter format is expected to be SAM; do not use the FQDN of your domain name (e.g., RUBRIK)." `n -ForeGroundColor Red
-  write-host "Usage: $usage" `n
-  write-host "Example: $example" `n
-  exit
-}
-
 # Rubrik Service Account User
-#The Rubrik User account is a non-login, least-privileged, vCenter Server account that you specify during deployment.
-$Rubrik_User = "$Domain\$Username"
+# The Rubrik User account is a non-login, least-privileged, vCenter Server account that you specify during deployment.
+$RubrikUser = "$Domain\$Username"
 
-# Rubrik Role Name
-$Rubrik_Role = "Rubrik_Backup_Service"
-
-#Privileges to assign to role
+#Baseline Privileges to assign to role
 #See the Rubrik Administrators Guide for Required Permissions
-$Rubrik_Privileges = @(
+$Rubrik_AVS_Privileges = @(
   'Datastore.AllocateSpace'
   'Datastore.Browse'
   'Datastore.Config'
-  'Datastore.Delete'
   'Datastore.FileManagement'
-  'Datastore.Move'
-  'Global.DisableMethods'
-  'Global.EnableMethods'
-  'Global.Licenses'
-  'Host.Config.Image'  
-  'Host.Config.Storage'
+  'Global.ManageCustomFields' # Added for newer versions of CDM
+  'Global.SetCustomField' #Added for newer versions of CDM
+  'InventoryService.Tagging.AttachTag' # Added for newer versions of CDM.
   'Network.Assign'
   'Resource.AssignVMToPool'
   'Resource.ColdMigrate'
   'Resource.HotMigrate'
-  'Sessions.TerminateSession'
+  'Resource.QueryVMotion' # Added for newer versions of CDM
   'Sessions.ValidateSession'
   'StorageProfile.View'
   'StorageViews.View'
@@ -134,18 +116,17 @@ $Rubrik_Privileges = @(
   'System.View'
   'VirtualMachine.Config.AddExistingDisk'
   'VirtualMachine.Config.AddNewDisk'
+  'VirtualMachine.Config.AddRemoveDevice'
   'VirtualMachine.Config.AdvancedConfig'
   'VirtualMachine.Config.ChangeTracking'
+  'VirtualMachine.Config.CPUCount' # Added for AppFlows support
   'VirtualMachine.Config.DiskLease'
+  'VirtualMachine.Config.EditDevice' 
+  'VirtualMachine.Config.Memory' # Added for AppFlows support
+  'VirtualMachine.Config.RemoveDisk'
   'VirtualMachine.Config.Rename'
   'VirtualMachine.Config.Resource'
-  'VirtualMachine.Config.Settings'
   'VirtualMachine.Config.SwapPlacement'
-  'VirtualMachine.Config.RemoveDisk'
-  'VirtualMachine.Config.CPUCount' # Added for AppFlows support
-  'VirtualMachine.Config.Memory' # Added for AppFlows support
-  'VirtualMachine.Config.AddRemoveDevice'
-  'VirtualMachine.Config.EditDevice'
   'VirtualMachine.GuestOperations.Execute'
   'VirtualMachine.GuestOperations.Modify'
   'VirtualMachine.GuestOperations.Query'
@@ -159,9 +140,9 @@ $Rubrik_Privileges = @(
   'VirtualMachine.Interact.Suspend'
   'VirtualMachine.Interact.ToolsInstall'
   'VirtualMachine.Inventory.Create'
+  'VirtualMachine.Inventory.CreateFromExisting' # Added for AppFlows support
   'VirtualMachine.Inventory.Delete'
   'VirtualMachine.Inventory.Move'
-  'VirtualMachine.Inventory.CreateFromExisting' # Added for AppFlows support
   'VirtualMachine.Inventory.Register'
   'VirtualMachine.Inventory.Unregister'
   'VirtualMachine.Provisioning.Clone' # Added for AppFlows support
@@ -175,9 +156,41 @@ $Rubrik_Privileges = @(
   'VirtualMachine.State.RevertToSnapshot'
 )
 
-Write-Host "Connecting to vCenter at $vCenter.  A prompt should be presented shortly."`n -ForeGroundColor Cyan
-Write-Host "You will need to provide credentials for a vCenter account with admin privileges to create the Role and assign that role to $Rubrik_User"`n -ForeGroundColor Cyan
-Connect-VIServer $vCenter -Force | Out-Null # Added '-Force' to avoid certificate warnings leading to login failures
+# These privileges are not allowed in AVS but are allowed in VMC and GCVE
+$Rubrik_VMC_GCVE_Privileges = $Rubrik_AVS_Privileges + @(
+  'StorageProfile.Update' # Added for newer versions of CDM. Not allowed in AVS at this time.
+  'VApp.Import' # Required for HotAdd proxies (VMC/GCVE/AVS only)
+)
+
+# These Privileges are noy allowed in VMC, AVS or GCVE
+$Rubrik_OnPrem_Privileges = $Rubrik_VMC_GCVE_Privileges + @(
+  'Cryptographer.Access' # Added for vSphere 6.7?
+  'Datastore.Move'
+  'Datastore.Delete'
+  'Global.DisableMethods' # Added for AppFlows
+  'Global.EnableMethods' # Added for AppFlows
+  'Global.Licenses'
+  'Host.Config.Image'
+  'Host.Config.Maintenance'
+  'Host.Config.Patch'
+  'Host.Config.Storage'
+  'Sessions.TerminateSession'
+)
+
+if ($vCenterType -eq 'ONPREM') {
+  $Rubrik_Privileges = $Rubrik_OnPrem_Privileges
+} 
+elseif ($vCenterType -eq 'AVS') {
+  $Rubrik_Privileges = $Rubrik_AVS_Privileges
+}
+elseif ($vCenterType -eq 'GCVE') {
+  $Rubrik_Privileges = $Rubrik_VMC_GCVE_Privileges
+}
+elseif ($vCenterType -eq 'VMC') {
+  $Rubrik_Privileges = $Rubrik_VMC_GCVE_Privileges
+}
+
+Write-Host "Connecting to vCenter at $vCenter."`n -ForeGroundColor Cyan
 
 Write-Host "Creating a new role called $Rubrik_Role "`n -ForeGroundColor Cyan 
 New-VIRole -Name $Rubrik_Role -Privilege (Get-VIPrivilege -id $Rubrik_Privileges) | Out-Null
