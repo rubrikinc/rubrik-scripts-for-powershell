@@ -48,7 +48,7 @@ param (
 
   [Parameter(Mandatory = $true)]
   # Hostname, FQDN or IP of the vCenter server.
- [string]$vCenter,
+  [string]$vCenter,
 
   [Parameter(Mandatory = $false)]
   # vCenter user with with admin privileges to create the Role and assign that role.
@@ -60,7 +60,7 @@ param (
 
   [Parameter(Mandatory = $true)]
   # Rubrik Service Account in vSphere to assign Rubrik privileges to.
- [string]$Username,
+  [string]$Username,
 
   [Parameter(Mandatory = $true)]
   # Domain of Rubrik Service Account in vSphere to assign Rubrik privileges to. 
@@ -220,7 +220,6 @@ elseif (Test-Path $vCenterCredFile) {
 
   Connect-VIServer -Server $vCenter -Credential $credential -Force | Out-Null
 }
-
 
 Write-Host "Creating a new role called $RubrikRole "`n -ForeGroundColor Cyan 
 New-VIRole -Name $RubrikRole -Privilege (Get-VIPrivilege -id $Rubrik_Privileges) | Out-Null
