@@ -49,6 +49,8 @@ param (
  [string]$Domain
 )
 
+Import-Module VMware.VimAutomation.Core
+
 clear-host
 
 $usage = ".\create_vCenter_User.ps1 -vCenter vCenterFQDNorIP -Username RubrikServiceAccountName -Domain SAMAuthenticationDomain"
