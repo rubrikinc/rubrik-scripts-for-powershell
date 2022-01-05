@@ -103,7 +103,7 @@ if ( $AutoSeed.seeding_mode_desc -eq "AUTOMATIC"){
 #endregion
 
 #region Rubrik Connection
-Write-Host "Connecting to Rubrik:$RubrikServer"
+Write-Host "- Connecting to Rubrik:$RubrikServer"
 switch($true){
     {$RubrikCredentialFile} {$RubrikCredential = Import-CliXml -Path $RubrikCredentialFile
         $ConnectRubrik = @{
@@ -129,7 +129,7 @@ Connect-Rubrik @ConnectRubrik
 #endregion
 
 #Get information about the database we will add to an availaility group
-Write-Host "Getting information about $DatabaseName on $PrimarySQLServerInstance from $RubrikServer"
+Write-Host "- Getting information about $DatabaseName on $PrimarySQLServerInstance from $RubrikServer"
 $RubrikDatabase = Get-RubrikDatabase -Name $DatabaseName -ServerInstance $PrimarySQLServerInstance -DetailedObject | Where-Object {$_.isRelic -eq $false}
 if ([bool]($RubrikDatabase.PSobject.Properties.name -match "id") -eq $false){
     Write-Error -Message "Database $DatabaseName on $PrimarySQLServerInstance not found on $RubrikServer"
@@ -146,7 +146,7 @@ if ([bool]($RubrikDatabase.latestRecoveryPoint) -eq $false){
 $SourceSQLInstance = Get-RubrikSQLInstance -ServerInstance $PrimarySQLServerInstance
 
 #Is the database already in an availability group?
-Write-Host "Checking to see if database is not already in an Availability Group"
+Write-Host "- Checking to see if database is not already in an Availability Group"
 $Query = "SELECT top 1 database_id 
 FROM sys.dm_hadr_database_replica_states
 WHERE database_id = DB_ID('$($DatabaseName)')"
@@ -241,13 +241,37 @@ foreach ($Replica in $Replicas){
     }
     $ReplicasInAG += $db
 }
+$ReplicasInAG
+break
+# #Wait for log shipping requests to complete for all replicas
+# foreach($Replica in $ReplicasinAG | Where-Object Primary -eq $false)
+# {  
+#     Get-RubrikRequest -id $Replica.RubrikRequest.id -WaitForCompletion -Type mssql
+#     # Get-RubrikRequestInfo -RubrikRequest $Replica.RubrikRequest
+# }
 
-#Wait for log shipping requests to complete for all replicas
-foreach($Replica in $ReplicasinAG | Where-Object Primary -eq $false)
-{  
-    Get-RubrikRequest -id $Replica.RubrikRequest.id -WaitForCompletion -Type mssql
-    # Get-RubrikRequestInfo -RubrikRequest $Replica.RubrikRequest
-}
+# Write-Host "Wait for all of the logs to be applied" -ForegroundColor Green
+# foreach($Replica in $ReplicasinAG | Where-Object Primary -eq $false)
+# {  
+#     $GetRubrikLogShipping = @{
+#         PrimaryDatabaseId = $RubrikDatabase.id
+#     }
+#     $RubrikLogShipping = Get-RubrikLogShipping @GetRubrikLogShipping
+
+
+# Foreach ($LogShippedDB in $RubrikLogShipping){
+#     do{
+#         $CheckRubrikLogShipping = Get-RubrikLogShipping -id $LogShippedDB.id
+#         $lastAppliedPoint = ($CheckRubrikLogShipping.lastAppliedPoint)
+#         Start-Sleep -Seconds 1
+#     } until ($latestRecoveryPoint -eq $lastAppliedPoint)
+#     if ($RemoveLogShipping -eq $true){
+#         Write-Host "Removing Log Shipping from $($LogShippedDB.location)" -ForegroundColor Green
+#         Remove-RubrikLogShipping -id $LogShippedDB.id
+#     }
+# }
+
+
 
 #Add all replicas to the availability group and then remove log shipping. 
 foreach($Replica in $ReplicasinAG | Sort-Object Primary -Descending )
