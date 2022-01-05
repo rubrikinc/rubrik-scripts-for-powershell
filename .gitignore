@@ -3,3 +3,6 @@
 Export-RubrikDatabasesJobFile - DN Test.json
 .idea
 .DS_Store
+.devcontainer/Dockerfile
+.devcontainer/devcontainer.json
+.devcontainer/library-scripts/common-debian.sh
