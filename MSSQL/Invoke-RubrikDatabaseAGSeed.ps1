@@ -131,6 +131,7 @@ Connect-Rubrik @ConnectRubrik
 #Get information about the database we will add to an availaility group
 Write-Host "- Getting information about $DatabaseName on $PrimarySQLServerInstance from $RubrikServer"
 $RubrikDatabase = Get-RubrikDatabase -Name $DatabaseName -ServerInstance $PrimarySQLServerInstance -DetailedObject | Where-Object {$_.isRelic -eq $false}
+Write-Debug -Message ($RubrikDatabase | Out-String)
 if ([bool]($RubrikDatabase.PSobject.Properties.name -match "id") -eq $false){
     Write-Error -Message "Database $DatabaseName on $PrimarySQLServerInstance not found on $RubrikServer"
     break
@@ -144,6 +145,7 @@ if ([bool]($RubrikDatabase.latestRecoveryPoint) -eq $false){
 
 #Go to the primary replica and get the other replica servers
 $SourceSQLInstance = Get-RubrikSQLInstance -ServerInstance $PrimarySQLServerInstance
+Write-Debug -Message ($SourceSQLInstance | Out-String)
 
 #Is the database already in an availability group?
 Write-Host "- Checking to see if database is not already in an Availability Group"
@@ -151,6 +153,7 @@ $Query = "SELECT top 1 database_id
 FROM sys.dm_hadr_database_replica_states
 WHERE database_id = DB_ID('$($DatabaseName)')"
 $Groups = Invoke-Sqlcmd -ServerInstance $PrimarySQLServerInstance -Query $Query 
+Write-Debug -Message ($Groups | Out-String)
 
 if ([bool]($Groups.PSobject.Properties.name -match "database_id") -eq $true){
     Write-Error "Database is already a member of an Availability Group"
@@ -158,7 +161,7 @@ if ([bool]($Groups.PSobject.Properties.name -match "database_id") -eq $true){
 }
 
 #What replicas are involved in the availbility group?
-Write-Host "Getting replica servers involved in $AvailabilityGroupName from $PrimarySQLServerInstance"
+Write-Host "- Getting replica servers involved in $AvailabilityGroupName from $PrimarySQLServerInstance"
 If ($($SourceSQLInstance.Version).substring(0,$SourceSQLInstance.Version.indexOf(".")) -ge 13){
     $Query = "SELECT replica_server_name
     FROM [sys].[availability_groups] groups
@@ -174,33 +177,38 @@ else{
     WHERE name = '$($AvailabilityGroupName)' "  
 }
 $Replicas = Invoke-Sqlcmd -ServerInstance $PrimarySQLServerInstance -Query $Query 
-
+Write-Debug -Message ($Replicas | Out-String)
 [System.Collections.ArrayList] $ReplicasInAG=@()
 foreach ($Replica in $Replicas){
     $db = New-Object PSObject
-    $db | Add-Member -type NoteProperty -Name ReplicaServerName -Value $Replica.replica_server_name
     if ($Replica.replica_server_name.IndexOf("\") -gt 0){
-        Write-Host "Getting information about $($Replica.replica_server_name) from $($RubrikServer)"
+        # Write-Host "- Getting information about $($Replica.replica_server_name) from $($RubrikServer)"
         $HostName = $Replica.replica_server_name.Substring(0,$Replica.replica_server_name.IndexOf("\"))
         $Instance = $Replica.replica_server_name.Substring($Replica.replica_server_name.IndexOf("\")+1,($Replica.replica_server_name.Length - $Replica.replica_server_name.IndexOf("\")) -1  )
         $TargetInstance = Get-RubrikSQLInstance -ServerInstance $Replica.replica_server_name
         if ([bool]($TargetInstance.PSobject.Properties.name -match "id") -eq $false){
             $FQDN = ([System.Net.Dns]::GetHostByName(($HostName))).hostname
+            Write-Debug -Message "- FQDN: [$($FQDN)]"
             $TargetInstance = Get-RubrikSQLInstance -ServerInstance "$($FQDN)\$($Instance)"
             $Replica.replica_server_name = "$($FQDN)\$($Instance)"
         }
     }
     else{
-        Write-Host "Getting information about $($Replica.replica_server_name) from $($RubrikServer)"
+        # Write-Host "- Getting information about $($Replica.replica_server_name) from $($RubrikServer)"
         $HostName = $Replica.replica_server_name
         $Instance = "DEFAULT"
         $TargetInstance = Get-RubrikSQLInstance -ServerInstance $Replica.replica_server_name
         if ([bool]($TargetInstance.PSobject.Properties.name -match "id") -eq $false){
             $FQDN = ([System.Net.Dns]::GetHostByName(($HostName))).hostname
+            Write-Debug -Message "FQDN:                     [$($FQDN)]"
             $TargetInstance = Get-RubrikSQLInstance -ServerInstance $FQDN
+            $Replica.replica_server_name = $FQDN
         }
     }
-
+    Write-Debug -Message ($TargetInstance | Out-String)
+    
+    $db | Add-Member -type NoteProperty -Name ReplicaServerName -Value $Replica.replica_server_name
+    $db | Add-Member -Type NoteProperty -Name RubrikDatabaseId -Value $RubrikDatabase.id
 
     if ([bool]($TargetInstance.PSobject.Properties.name -match "id") -eq $false){
         Write-Error -Message "$($Replica.replica_server_name) was not found on $RubrikServer"
@@ -211,13 +219,15 @@ foreach ($Replica in $Replicas){
     $db | Add-Member -type NoteProperty -name Instance -Value $Instance
     $db | Add-Member -type NoteProperty -name DatabaseName -Value $DatabaseName
     
-
+    
     if ($Replica.replica_server_name -ne $PrimarySQLServerInstance){
         $Query = "SELECT state_desc FROM sys.databases WHERE name = '" + $DatabaseName + "'" 
+        Write-Debug -Message "replica_server_name:      [$($Replica.replica_server_name)]"
+        Write-Debug -Message "Query:                    [$($Query)]"
         $Results = Invoke-Sqlcmd -ServerInstance $Replica.replica_server_name -Query $Query 
 
         if ([bool]($Results.PSobject.Properties.name -match "state_desc") -eq $true){
-            Write-Host "$($DatabaseName) already exists on $($Replica.replica_server_name). Unable to setup log shipping when database already exists"
+            Write-Error -Message "[$($DatabaseName)] already exists on $($Replica.replica_server_name). Unable to setup log shipping when database already exists."
             $db | Add-Member -type NoteProperty -name RubrikRequest -Value "FAILED"
             $db | Add-Member -type NoteProperty -name Primary -Value $false
             break
@@ -226,7 +236,7 @@ foreach ($Replica in $Replicas){
             $TargetFilePaths = Get-RubrikDatabaseFiles -Id $RubrikDatabase.id `
                 -RecoveryDateTime $RubrikDatabase.latestRecoveryPoint | Select-Object LogicalName,@{n='exportPath';e={$_.OriginalPath}},@{n='newFilename';e={$_.OriginalName}} 
 
-            Write-Host "Setting up log shipping between $PrimarySQLServerInstance and $($Replica.replica_server_name)"
+            Write-Host "- Setting up log shipping between $PrimarySQLServerInstance and $($Replica.replica_server_name)"
             $RubrikRequest = New-RubrikLogShipping -id $RubrikDatabase.id `
                 -targetInstanceId $TargetInstance.id `
                 -targetDatabaseName $DatabaseName `
@@ -234,6 +244,7 @@ foreach ($Replica in $Replicas){
                 -TargetFilePaths $TargetFilePaths 
             $db | Add-Member -type NoteProperty -name RubrikRequest -Value $RubrikRequest
             $db | Add-Member -type NoteProperty -name Primary -Value $false
+            # $db | Add-Member -Type NoteProperty -Name RubrikDatabaseId -Value $RubrikDatabase.id
         }
     }
     else{
@@ -241,50 +252,54 @@ foreach ($Replica in $Replicas){
     }
     $ReplicasInAG += $db
 }
-$ReplicasInAG
-break
-# #Wait for log shipping requests to complete for all replicas
-# foreach($Replica in $ReplicasinAG | Where-Object Primary -eq $false)
-# {  
-#     Get-RubrikRequest -id $Replica.RubrikRequest.id -WaitForCompletion -Type mssql
-#     # Get-RubrikRequestInfo -RubrikRequest $Replica.RubrikRequest
-# }
 
-# Write-Host "Wait for all of the logs to be applied" -ForegroundColor Green
-# foreach($Replica in $ReplicasinAG | Where-Object Primary -eq $false)
-# {  
-#     $GetRubrikLogShipping = @{
-#         PrimaryDatabaseId = $RubrikDatabase.id
-#     }
-#     $RubrikLogShipping = Get-RubrikLogShipping @GetRubrikLogShipping
+Write-Debug -Message ($ReplicasInAG | Out-String)
 
+#Wait for log shipping requests to complete for all replicas
+Write-Host "- Wait for all of the logs to be applied" -ForegroundColor Green
+foreach($Replica in $ReplicasinAG | Where-Object Primary -eq $false)
+{  
+    Write-Host "- Initializing Log Shipping of $($PrimarySQLServerInstance).$($Replica.DatabaseName) to $($Replica.ReplicaServerName)"
+    Get-RubrikRequest -id $Replica.RubrikRequest.id -WaitForCompletion -Type mssql
 
-# Foreach ($LogShippedDB in $RubrikLogShipping){
-#     do{
-#         $CheckRubrikLogShipping = Get-RubrikLogShipping -id $LogShippedDB.id
-#         $lastAppliedPoint = ($CheckRubrikLogShipping.lastAppliedPoint)
-#         Start-Sleep -Seconds 1
-#     } until ($latestRecoveryPoint -eq $lastAppliedPoint)
-#     if ($RemoveLogShipping -eq $true){
-#         Write-Host "Removing Log Shipping from $($LogShippedDB.location)" -ForegroundColor Green
-#         Remove-RubrikLogShipping -id $LogShippedDB.id
-#     }
-# }
+    do{
+        #region Last Applied Point
+        $GetRubrikLogShipping = @{
+            PrimaryDatabaseId = $Replica.RubrikDatabaseId
+            location = $Replica.ReplicaServerName
+        }
+        $CheckRubrikLogShipping = Get-RubrikLogShipping @GetRubrikLogShipping
+        Write-Debug -Message ($CheckRubrikLogShipping | Out-String)
+        $lastAppliedPoint = ($CheckRubrikLogShipping.lastAppliedPoint)
+        Write-Debug -Message "LastAppliedPoint:                 [$($lastAppliedPoint)]"
+        #endregion
 
+        #region Lastest Recovery Point
+        $GetRubrikDatabase = @{
+            id = $Replica.RubrikDatabaseId
+            DetailedObject = $true
+        }
+        $CheckRubrikLogShipping = Get-RubrikDatabase @GetRubrikDatabase
+        $latestRecoveryPoint = $CheckRubrikLogShipping.latestRecoveryPoint
+        Write-Debug -Message "latestRecoveryPoint:              [$($latestRecoveryPoint)]"
+        #endregion
+        Start-Sleep -Seconds 1
+    } until ($latestRecoveryPoint -eq $lastAppliedPoint)
+}
 
 
 #Add all replicas to the availability group and then remove log shipping. 
 foreach($Replica in $ReplicasinAG | Sort-Object Primary -Descending )
 {
     if ([bool]($Replica.Primary) -eq $true){
-        Write-Host "Adding $($DatabaseName) to $($AvailabilityGroupName) on $($Replica.ReplicaServerName)"
+        Write-Host "- Adding $($DatabaseName) to $($AvailabilityGroupName) on $($Replica.ReplicaServerName)"
         $Query = "ALTER AVAILABILITY GROUP [$($AvailabilityGroupName)] ADD DATABASE [$($DatabaseName)];"
     }
     else {
-        Write-Host "Joining $($DatabaseName) to $($AvailabilityGroupName) on $($Replica.ReplicaServerName)"
+        Write-Host "- Joining $($DatabaseName) to $($AvailabilityGroupName) on $($Replica.ReplicaServerName)"
         $Query = "ALTER DATABASE [$($DatabaseName)] SET HADR AVAILABILITY GROUP =  [$($AvailabilityGroupName)]; "
     }
     Invoke-Sqlcmd -ServerInstance $Replica.ReplicaServerName -Query $Query -Verbose
 }
-Write-Host "Removing Log Shipping for $DatabaseName"
+Write-Host "- Removing Log Shipping for $DatabaseName"
 Get-RubrikLogShipping -PrimaryDatabaseName $DatabaseName -SecondaryDatabaseName $DatabaseName | Remove-RubrikLogShipping
