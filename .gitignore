@@ -6,3 +6,5 @@ Export-RubrikDatabasesJobFile - DN Test.json
 .devcontainer/Dockerfile
 .devcontainer/devcontainer.json
 .devcontainer/library-scripts/common-debian.sh
+vcenter_cred*.xml
+settings.json
