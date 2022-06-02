@@ -13,10 +13,18 @@ Represents the IP Address or Name of the Rubrik Cluster
 Download location of the RubrikBackupService.zip from the RubrikCluster
 
 .PARAMETER ComputerName
-Server to install the Rubrik Backup Service On
+Server to install the Rubrik Backup Service On. This is not Mandorty when you are supplying a the ComputerFile Option.
+
+.PARAMETER Ashost
+A True or False for if you want to add the system to Rubrik as a Host or just to Register the RBS with a VM. 
+
+.PARAMETER ComputerFile
+Use this option if you want to run agenst a larger number of systems. if supplying a CSV please make sure it is only 1 collom with no collom heders. you can supply a txt or CSV file.
 
 .EXAMPLE
-.\Install-RubrikBackupService.ps1 -RubrikCluster 172.21.8.51 -computername cl-sql2012-1a
+.\Install-RubrikBackupService.ps1 -RubrikCluster 172.21.8.51 -computername cl-sql2012-1a -ashost $false
+.\Install-RubrikBackupService.ps1 -RubrikCluster 172.21.8.51 -computerfile "\Hosts.txt" -ashost $true
+.\Install-RubrikBackupService.ps1 -RubrikCluster 172.21.8.51 -computername cl-sql2012-1a -rubrikapitoken "<Cluster Token>" -ashost $false
 
 .NOTES
     Name:               Install Rubrik Backup Service
@@ -31,7 +39,8 @@ param(
     [string]$RubrikCluster,
     
     # Computer(s) that should have the Rubrik Backup Service installed onto and then added into Rubrik
-    [Parameter(Mandatory=$true)]
+    [Parameter(ParameterSetName='FromFile', Mandatory=$false)]
+    [parameter(ParameterSetName='FromList', Mandatory=$true)]
     [String[]]$ComputerName,
 
     # Credential to run the Rubrik Backup Service on the Computer
@@ -44,10 +53,25 @@ param(
 
     # Parameter help description
     [Parameter(Mandatory=$false)]
-    [string]$OutFile = "c:\temp\RubrikBackupService.zip"
+    [string]$OutFile = "c:\temp\RubrikBackupService.zip",
 
-    
+    # Path to use a imported file for the list of server. 
+    [Parameter(ParameterSetName='FromList', Mandatory=$false)]
+    [Parameter(ParameterSetName='FromFile', Mandatory=$true)]
+    [string]$ComputerFile,
+
+    # Parameter for useing a API token
+    [Parameter(Mandatory=$false)]
+    [string]$RubrikAPItoken,
+
+    # Add as new Host or register RBS with a vm
+    [parameter(Mandatory=$true)]
+    [bool]$Ashost
 )
+
+if ($ComputerFile) {
+    $ComputerName = Get-Content $ComputerFile    
+}
 
 if ($RBSCredential){
     $RubrikServiceAccount = $RBSCredential    
@@ -63,12 +87,18 @@ if ($RubrikCredential){
         Credential = $RubrikCredential
     }
 }
-else{
+elseif ($rubrikAPIToken) {
+        $RubrikConnection = @{
+            Server = $rubrikCluster
+            Token = $RubrikAPItoken
+    }
+}elseif (!$RubrikCredential) {
     $RubrikConnection = @{
         Server = $RubrikCluster
         Credential = Get-Credential -Message "Enter user name and password for your Rubrik Cluster"
     }
 }
+
 
 $OutputPath = ".\MOF\"
 #region Download the Rubrik Connector 
@@ -135,8 +165,13 @@ foreach($Computer in $ComputerName){
     }  
 }
 
+#install Rubrik CLI and connect to the cluster.
+Install-Module Rubrik
+Connect-Rubrik @RubrikConnection | Out-Null
+
+#install RBS
 foreach($Computer in $ValidComputerList){
-    $Computer
+    Write-Verbose "Installing RBS on: $Computer"
     #region Push the RubrikBackupService.zip to remote computer
     if (Test-Path -Path $OutFile)
     {
@@ -164,6 +199,16 @@ foreach($Computer in $ValidComputerList){
         Start-Process -FilePath "C:\Temp\RubrikBackupService\RubrikBackupService.msi" -ArgumentList "/quiet" -Wait
     }
     #endregion
+    
+    #sleep for 2 seconds to let the install finish and the services to start.
+    Start-Sleep -Seconds 2
+  
+    #region Add RBS to the firewall.
+    Invoke-Command -ComputerName $Computer -ScriptBlock {
+        New-NetFirewallRule -Program "C:\Program Files\Rubrik\Rubrik Backup Service\rba.exe" -Action Allow -Profile Domain,Private,Public -DisplayName "Rurbrik Backup Agent" -Direction Inbound
+        New-NetFirewallRule -Program "C:\Program Files\Rubrik\Rubrik Backup Service\rbs.exe" -Action Allow -Profile Domain,Private,Public -DisplayName "Rurbrik Backup Service" -Direction Inbound
+    }
+
 
     $ConfigurationData = @{
         AllNodes = @(
@@ -187,10 +232,17 @@ foreach($Computer in $ValidComputerList){
     Get-Service -Name "Rubrik Backup Service" -ComputerName $Computer | Stop-Service 
     Get-Service -Name "Rubrik Backup Service" -ComputerName $Computer | Start-Service
 
-    #Add the host to Rubrik 
-    Import-Module Rubrik
-    Connect-Rubrik @RubrikConnection | Out-Null
+    Write-Verbose "Install completed on: $Computer."
 
-    New-RubrikHost -Name $Computer -Confirm:$false
-
+   
+if ($Ashost -eq $true) {
+    #Add the System to Rubrik as a host
+    New-RubrikHost -Name "$Computer" -Confirm:$false 
+    Write-Verbose "Adding $Computer to Rubrik Cluster as a host"
+} else {
+    #Register VM to Rubrik 
+    Get-RubrikVM -Name "$Computer" | Register-RubrikBackupService 
+    Write-Verbose "Registering RBS on VM: $Computer "
+} 
 }
+
