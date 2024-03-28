@@ -96,36 +96,55 @@ $RubrikUser = "$Domain\$Username"
 #Baseline Privileges to assign to role
 #See the Rubrik Administrators Guide for Required Permissions
 $Rubrik_AVS_Privileges = @(
+  'Cryptographer.Access' # Added for Encrypted VM Support
   'Datastore.AllocateSpace'
   'Datastore.Browse'
   'Datastore.Config'
+  'Datastore.Delete'
   'Datastore.FileManagement'
+  'Datastore.Move'
+  'Global.DisableMethods' # Added for AppFlows
+  'Global.EnableMethods' # Added for AppFlows
+  'Global.Licenses'
   'Global.ManageCustomFields' # Added per Rubrik CDM 6.0 Documentation
   'Global.SetCustomField' # Added per Rubrik CDM 6.0 Documentation
+  'Host.Config.Image' # Added for CDP filter driver management
+  'Host.Config.Maintenance' # Added for CDP filter driver management
+  'Host.Config.Patch' # Added for CDP filter driver management
+  'Host.Config.Storage' # Added for Live Mount
+  'Host.Config.SystemManagement'
   'InventoryService.Tagging.AttachTag' # Used by Rubrik to reapply tags when recovering virtual machines. (vSphere 6.7 or earlier only)
+  'InventoryService.Tagging.CreateCategory'
+  'InventoryService.Tagging.CreateTag'
+  'InventoryService.Tagging.ObjectAttachable' # Used by Rubrik to reapply tags when recovering virtual machines. (vSphere 7.0 or later only)
   'Network.Assign'
   'Resource.AssignVMToPool'
-  'Resource.ColdMigrate'
-  'Resource.HotMigrate'
+  'Resource.ColdMigrate' # Supports Rubrik's Built in vMotion Workflows
+  'Resource.HotMigrate' # Supports Rubrik's Built in vMotion Workflows
   'Resource.QueryVMotion' # Check for vMotion in flight before taking snapshot
-  'Sessions.ValidateSession'
+  'Sessions.TerminateSession' # Helps maintain Rubrik's connection pool to vCenter
+  'Sessions.ValidateSession' # Helps maintain Rubrik's connection pool to vCenter
+  'StorageProfile.Update'  # Added for CDP filter driver management. Not allowed in AVS at this time.
   'StorageProfile.View' # Added for CDP filter driver management
   'StorageViews.View'
   'System.Anonymous'
   'System.Read'
   'System.View'
+  'VApp.Import' # Required for HotAdd proxies (VMC/GCVE/AVS only)
   'VirtualMachine.Config.AddExistingDisk'
   'VirtualMachine.Config.AddNewDisk'
   'VirtualMachine.Config.AddRemoveDevice'
   'VirtualMachine.Config.AdvancedConfig'
-  'VirtualMachine.Config.ChangeTracking'
+  'VirtualMachine.Config.Annotation'
   'VirtualMachine.Config.CPUCount' # Added for AppFlows support
+  'VirtualMachine.Config.ChangeTracking'
   'VirtualMachine.Config.DiskLease'
   'VirtualMachine.Config.EditDevice' 
   'VirtualMachine.Config.Memory' # Added for AppFlows support
   'VirtualMachine.Config.RemoveDisk'
   'VirtualMachine.Config.Rename'
   'VirtualMachine.Config.Resource'
+  'VirtualMachine.Config.Settings'
   'VirtualMachine.Config.SwapPlacement'
   'VirtualMachine.GuestOperations.Execute'
   'VirtualMachine.GuestOperations.Modify'
@@ -146,6 +165,7 @@ $Rubrik_AVS_Privileges = @(
   'VirtualMachine.Inventory.Register'
   'VirtualMachine.Inventory.Unregister'
   'VirtualMachine.Provisioning.Clone' # Added for AppFlows support
+  'VirtualMachine.Provisioning.Customize'
   'VirtualMachine.Provisioning.DiskRandomAccess'
   'VirtualMachine.Provisioning.DiskRandomRead'
   'VirtualMachine.Provisioning.GetVmFiles'
