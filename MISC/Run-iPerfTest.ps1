@@ -53,7 +53,7 @@ if ($iperfExists -eq $false){
 #endregion
 
 #region Get the list of nodes from the Rubrik Cluster
-Connect-Rubrik -Server $RubrikServer
+Connect-Rubrik -Server $RubrikServer -id "client|de50a555-a272-4725-a861-aab52bfdfd41" -Secret "3-j3NjAkCRok5PF5Q_K9U9-kGb3VZpWiEN-aEBMjcnXEfnGvou9atgpM-vsvtK0k"
 $RubrikNodes = (Invoke-RubrikRESTCall -Endpoint 'cluster/me/node' -Method GET -api 'internal').data
 #endregion
 
@@ -68,18 +68,18 @@ foreach($RubrikNode in $RubrikNodes){
             Write-Host "Running .\iperf.exe -c $($RubrikNode.ipAddress) -i 5 -t 60 -w 1M"
             .\iperf.exe -c $RubrikNode.ipAddress -i 5 -t 60 -w 1M > "iperf_$($HostName)_to_$($RubrikNode.ipAddress)_1MB_1_Thread.txt"
 
-            Write-Host "Running .\iperf.exe -c $($RubrikNode.ipAddress) -i 5 -t 60 -w 1M -P 16"
+            Write-Host "Running .\iperf.exe -c $($RubrikNode.ipAddress) -i 5 -t 60 -w 1M -P 8"
             .\iperf.exe -c $RubrikNode.ipAddress -i 5 -t 60 -w 1M -P 8 > "iperf_$($HostName)_to_$($RubrikNode.ipAddress)_1MB_8_Threads.txt"
         }
         3 {
             Write-Host "Running .\iperf3.exe -c $($RubrikNode.ipAddress) -i 5 -t 60"
-            .\iperf3.exe -c $($RubrikNode.ipAddress) -i 5 -t 60 > "iperf_$($HostName)_to_$($RubrikNode.ipAddress)_64K_1_Thread.txt"
+            .\iperf3.exe -c $($RubrikNode.ipAddress) -i 5 -t 60 --json > "iperf_$($HostName)_to_$($RubrikNode.ipAddress)_64K_1_Thread.json"
 
             Write-Host "Running .\iperf3.exe -c $($RubrikNode.ipAddress) -i 5 -t 60 -w 1M"
-            .\iperf3.exe -c $RubrikNode.ipAddress -i 5 -t 60 -w 1M > "iperf_$($HostName)_to_$($RubrikNode.ipAddress)_1MB_1_Thread.txt"
+            .\iperf3.exe -c $RubrikNode.ipAddress -i 5 -t 60 -w 1M --json > "iperf_$($HostName)_to_$($RubrikNode.ipAddress)_1MB_1_Thread.json"
 
-            Write-Host "Running .\iperf3.exe -c $($RubrikNode.ipAddress) -i 5 -t 60 -w 1M -P 16 "
-            .\iperf3.exe -c $RubrikNode.ipAddress -i 5 -t 60 -w 1M -P 8 > "iperf_$($HostName)_to_$($RubrikNode.ipAddress)_1MB_8_Threads.txt"
+            Write-Host "Running .\iperf3.exe -c $($RubrikNode.ipAddress) -i 5 -t 60 -w 1M -P 8 "
+            .\iperf3.exe -c $RubrikNode.ipAddress -i 5 -t 60 -w 1M -P 8 --json > "iperf_$($HostName)_to_$($RubrikNode.ipAddress)_1MB_8_Threads.json"
         }
     }
 }
