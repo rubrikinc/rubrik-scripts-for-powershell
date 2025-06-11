@@ -1,5 +1,5 @@
 # Powershell
-This repository contains completed and work-in-progress Powershell code by the Rubrik Ranger team (http://www.rubrik.com). Code here is intended to manage and automate tasks for the Rubrik platform.
+These PowerShell scripts are provided as examples and are community-supported only. They are not officially supported by Rubrik and come with no warranties or guarantees.
 
 CODE HERE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
 EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
